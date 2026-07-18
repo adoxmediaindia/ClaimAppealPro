@@ -1,0 +1,229 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AppealStatus {
+  DRAFT
+  ANALYZING
+  READY
+  GENERATED
+  EXPORTED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id            String          @id @db.Uuid // Matches Supabase auth.users.id
+  email         String          @unique @db.VarChar(255)
+  role          Role            @default(USER)
+  deletedAt     DateTime?       // Soft delete support
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  profile       Profile?
+  subscription  Subscription?
+  appeals       Appeal[]
+  payments      Payment[]
+  usageLogs     UsageLog[]
+  auditLogs     AuditLog[]
+  tickets       SupportTicket[]
+
+  @@index([email])
+  @@index([deletedAt])
+}
+
+model Profile {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @unique @db.Uuid
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String?   @db.VarChar(100)
+  lastName      String?   @db.VarChar(100)
+  clinicName    String?   @db.VarChar(200)
+  npiNumber     String?   @db.VarChar(10) // 10-digit National Provider Identifier
+  deletedAt     DateTime? // Soft delete support
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Appeal {
+  id                String          @id @default(uuid()) @db.Uuid
+  userId            String          @db.Uuid
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            AppealStatus    @default(DRAFT)
+  rawOcrText        String?         @db.Text
+  extractedMetadata Json?           // Parsed metadata fields from OCR
+  structuredInput   Json?           // User form edits
+  version           Int             @default(0) // Optimistic locking
+  deletedAt         DateTime?       // Soft delete support
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  files             File[]
+  versions          AppealVersion[]
+  aiGenerations     AiGeneration[]
+  pdfExports        AppealPdfExport[]
+
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([deletedAt])
+}
+
+model AppealVersion {
+  id             String    @id @default(uuid()) @db.Uuid
+  appealId       String    @db.Uuid
+  appeal         Appeal    @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  versionNumber  Int
+  letterContent  String    @db.Text
+  editorState    Json?
+  deletedAt      DateTime? // Soft delete support
+  createdAt      DateTime  @default(now())
+
+  @@unique([appealId, versionNumber], name: "appeal_version_unique_idx")
+  @@index([appealId])
+  @@index([deletedAt])
+}
+
+model File {
+  id            String    @id @default(uuid()) @db.Uuid
+  appealId      String    @db.Uuid
+  appeal         Appeal    @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  storagePath   String    @db.VarChar(512)
+  fileName      String    @db.VarChar(255)
+  fileSize      Int
+  mimeType      String    @db.VarChar(100)
+  deletedAt     DateTime? // Soft delete support
+  createdAt     DateTime  @default(now())
+
+  @@index([appealId])
+  @@index([deletedAt])
+}
+
+model Subscription {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @unique @db.Uuid
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @unique @db.VarChar(255)
+  stripeSubscriptionId String?   @unique @db.VarChar(255)
+  planId               String    @db.VarChar(50)
+  status               String    @db.VarChar(50)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
+}
+
+model Payment {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSessionId  String   @unique @db.VarChar(255)
+  amount           Int
+  currency         String   @default("USD") @db.VarChar(3)
+  status           String   @db.VarChar(50)
+  receiptUrl       String?  @db.VarChar(512)
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UsageLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action       String   @db.VarChar(100)
+  tokenCount   Int      @default(0)
+  costEstimate Float    @default(0.0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model AiGeneration {
+  id                 String   @id @default(uuid()) @db.Uuid
+  appealId           String   @db.Uuid
+  appeal             Appeal   @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  promptTokens       Int
+  completionTokens   Int
+  totalTokens        Int
+  cost               Float
+  promptTemplateUsed String?  @db.Text
+  rawResponse        String?  @db.Text
+  createdAt          DateTime @default(now())
+
+  @@index([appealId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(512)
+  action    String   @db.VarChar(100)
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action, createdAt])
+}
+
+model SupportTicket {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @db.Uuid
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String       @db.VarChar(255)
+  message   String       @db.Text
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(100)
+  value       Boolean  @default(false)
+  description String?  @db.VarChar(255)
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+}
+
+model AppealPdfExport {
+  id                  String    @id @default(uuid()) @db.Uuid
+  appealId            String    @db.Uuid
+  appeal              Appeal    @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  appealVersionNumber Int
+  templateName        String    @db.VarChar(50)
+  pageSize            String    @db.VarChar(10) // "letter" or "a4"
+  storagePath         String    @db.VarChar(512)
+  fileSize            Int
+  deletedAt           DateTime? // Soft delete support
+  createdAt           DateTime  @default(now())
+
+  @@index([appealId])
+}
+

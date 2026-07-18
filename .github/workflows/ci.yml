@@ -1,0 +1,59 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: |
+        npm ci
+
+    - name: Check Lint Rules
+      run: |
+        npm run lint
+
+    - name: Check TypeScript Compilation
+      run: |
+        npx tsc --noEmit
+
+    - name: Run Vitest Unit Tests
+      run: |
+        npx vitest run
+      env:
+        DATABASE_URL: "postgresql://postgres:password@localhost:5432/claimappealpro?schema=public"
+        NEXT_PUBLIC_SUPABASE_URL: "https://mock.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key-value"
+        SUPABASE_SERVICE_ROLE_KEY: "mock-service-role-key-value"
+        OPENAI_API_KEY: "mock-openai-key-value"
+        STRIPE_SECRET_KEY: "sk_test_mock-stripe-secret-key"
+        STRIPE_WEBHOOK_SECRET: "mock-stripe-webhook"
+        RESEND_API_KEY: "mock-resend-key-value"
+
+    - name: Validate Production Build
+      run: |
+        npm run build
+      env:
+        DATABASE_URL: "postgresql://postgres:password@localhost:5432/claimappealpro?schema=public"
+        NEXT_PUBLIC_SUPABASE_URL: "https://mock.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key-value"
+        SUPABASE_SERVICE_ROLE_KEY: "mock-service-role-key-value"
+        OPENAI_API_KEY: "mock-openai-key-value"
+        STRIPE_SECRET_KEY: "sk_test_mock-stripe-secret-key"
+        STRIPE_WEBHOOK_SECRET: "mock-stripe-webhook"
+        RESEND_API_KEY: "mock-resend-key-value"
