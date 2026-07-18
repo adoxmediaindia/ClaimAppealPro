@@ -51,7 +51,7 @@ test.describe('AI Appeal Generation & Versioning E2E Tests', () => {
     await expect(letterText).toBeVisible();
 
     // Verify Version history lists Version 1
-    const v1Indicator = page.locator('text=Draft Version #1');
+    const v1Indicator = page.locator('text=Draft Version #1').first();
     await expect(v1Indicator).toBeVisible();
 
     // 3. Trigger appeal letter regeneration
@@ -60,7 +60,7 @@ test.describe('AI Appeal Generation & Versioning E2E Tests', () => {
     await regenerateBtn.click();
 
     // Verify version list now shows Version 2
-    const v2Indicator = page.locator('text=Draft Version #2');
+    const v2Indicator = page.locator('text=Draft Version #2').first();
     await expect(v2Indicator).toBeVisible({ timeout: 10000 });
 
     // 4. Trigger roll-forward rollback to Version 1
@@ -69,7 +69,7 @@ test.describe('AI Appeal Generation & Versioning E2E Tests', () => {
     await restoreBtn.click();
 
     // Verify list updates showing Version 3 (created by roll-forward rollback of Version 1)
-    const v3Indicator = page.locator('text=Draft Version #3');
+    const v3Indicator = page.locator('text=Draft Version #3').first();
     await expect(v3Indicator).toBeVisible({ timeout: 10000 });
   });
 

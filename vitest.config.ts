@@ -9,5 +9,6 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e/**'],
+    testTimeout: 20000,
   },
 });

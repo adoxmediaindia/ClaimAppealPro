@@ -115,7 +115,7 @@ test.describe('Enterprise Admin Dashboard & Operations E2E Tests', () => {
     // Toggle Flag and check transition
     const disableButton = page.locator('button:has-text("Disable")').first();
     await disableButton.click();
-    await page.waitForTimeout(1000);
+    await expect(page.locator('button:has-text("Enable")').first()).toBeVisible({ timeout: 10000 });
 
     // Verify tab changes to Audit Logs
     const auditsTab = page.locator('button:has-text("Audit Logs")');

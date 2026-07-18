@@ -32,15 +32,15 @@ test.describe('Dashboard & Application Shell E2E tests', () => {
     await page.goto('/dashboard');
 
     // Click on Appeals navigation link
-    await page.click('text=Appeals');
+    await page.click('aside a:has-text("Appeals")');
     await expect(page).toHaveURL(/\/appeals/);
 
     // Click on Billing navigation link
-    await page.click('text=Billing');
+    await page.click('aside a:has-text("Billing")');
     await expect(page).toHaveURL(/\/billing/);
 
     // Click on Settings navigation link
-    await page.click('text=Settings');
+    await page.click('aside a:has-text("Settings")');
     await expect(page).toHaveURL(/\/settings/);
   });
 

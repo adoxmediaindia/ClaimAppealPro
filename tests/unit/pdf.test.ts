@@ -99,7 +99,21 @@ describe('PDF Generation & Rendering Engine Unit Tests', () => {
 
     it('should execute PDF export action generating database records and audit trails', async () => {
       // Seed a version record in the mock state
-      const mockState = (await import('@/lib/prisma')).getMockState();
+      const { getMockState, saveMockState } = await import('@/lib/prisma');
+      const mockState = getMockState();
+      if (!mockState.appeal) {
+        mockState.appeal = {
+          id: '00000000-0000-0000-0000-000000000000',
+          userId: 'mock-uuid',
+          status: 'READY',
+          createdAt: new Date().toISOString(),
+          filePath: 'mock-file.pdf',
+          originalName: 'denial.pdf',
+          versions: [],
+          aiGenerations: [],
+          pdfExports: [],
+        };
+      }
       mockState.appeal.versions = [
         {
           id: 'v1-id',
@@ -110,7 +124,7 @@ describe('PDF Generation & Rendering Engine Unit Tests', () => {
         },
       ];
       mockState.appeal.status = 'READY';
-      (await import('@/lib/prisma')).saveMockState(mockState);
+      saveMockState(mockState);
 
 
       const res = await generatePdfExportAction(mockState.appeal.id, 1, 'default', 'letter');

@@ -101,7 +101,7 @@ test.describe('Stripe Billing & Subscriptions E2E Tests', () => {
     await expect(proHeader).toBeVisible();
 
     // Verify invoice history table now lists the payment
-    const amountCell = page.locator('td:has-text("$49.00 USD")');
+    const amountCell = page.locator('td:has-text("$49.00 USD")').first();
     await expect(amountCell).toBeVisible();
 
     const refCell = page.locator('td:has-text("checkout_sub_mock-subscription-id")');

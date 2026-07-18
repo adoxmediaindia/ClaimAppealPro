@@ -126,7 +126,7 @@ test.describe('PDF Print & Export E2E Tests', () => {
     await expect(previewIframe).toBeVisible({ timeout: 25000 });
 
     // Verify version list updates showing PDF Export (AI v#1)
-    const exportRecord = page.locator('text=Template: professional (a4)');
+    const exportRecord = page.locator('text=Template: professional (a4)').first();
     await expect(exportRecord).toBeVisible({ timeout: 15000 });
   });
 
