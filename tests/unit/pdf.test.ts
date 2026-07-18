@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHtmlTemplate, RenderParams } from '@/lib/pdf/renderer';
 import { PuppeteerPdfProvider } from '@/lib/pdf/puppeteer';
-import { generatePdfExportAction, getPdfExportsAction, getPdfSignedUrlAction } from '@/app/actions/pdf';
+import { generatePdfExportAction } from '@/app/actions/pdf';
 import { prisma } from '@/lib/prisma';
 
 // Mock puppeteer package to force offline/sandbox mock generation fallback immediately
@@ -129,14 +129,14 @@ describe('PDF Generation & Rendering Engine Unit Tests', () => {
     it('should block PDF generation if the user is unauthenticated or does not own the appeal', async () => {
       const supabaseMock = await import('@/lib/supabase');
       // Force unauthenticated user mock
-      supabaseMock.createServerSideClient.mockImplementationOnce(() => ({
+      vi.mocked(supabaseMock.createServerSideClient).mockImplementationOnce(() => ({
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: null },
             error: new Error('Session expired'),
           }),
         },
-      }));
+      }) as any);
 
       const res = await generatePdfExportAction('some-appeal-id', 1, 'default');
       expect(res.success).toBe(false);

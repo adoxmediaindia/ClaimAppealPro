@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 import fs from 'fs';
 
 test.describe('Enterprise Admin Dashboard & Operations E2E Tests', () => {
-  const stateFilePath = 'C:\\Users\\prati\\AppData\\Local\\Temp\\mock_db_state.json';
   // Fallback to local appData path if Temp path is not matching prisma.ts
   const actualStateFilePath = 'C:\\Users\\prati\\.gemini\\antigravity\\brain\\99ddbc12-2335-4f25-804f-324c844e6864\\scratch\\mock_db_state.json';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getPlanById, getPlanByPriceId, SUBSCRIPTION_PLANS } from '@/lib/billing/plans';
+import { getPlanById, getPlanByPriceId } from '@/lib/billing/plans';
 import { createCheckoutSessionAction, createCustomerPortalAction, fetchInvoiceHistoryAction } from '@/app/actions/billing';
 import { processOcrForFile } from '@/app/actions/ocr';
 import { generateAppealAction } from '@/app/actions/ai';
