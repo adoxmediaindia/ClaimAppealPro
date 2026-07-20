@@ -58,10 +58,10 @@ export default function BillingClient({ initialSubscription, initialPayments, us
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-300">
       {error && (
-        <div className="flex items-center space-x-2 rounded-lg border border-red-900 bg-red-950/40 p-4 text-xs text-red-400">
-          <ShieldAlert className="h-4.5 w-4.5 shrink-0 text-red-500" />
+        <div className="flex items-center space-x-2 rounded-lg border border-rose-900 bg-rose-955/20 p-4 text-xs text-rose-450 animate-in slide-in-from-top-1">
+          <ShieldAlert className="h-4.5 w-4.5 shrink-0 text-rose-400" />
           <span>{error}</span>
         </div>
       )}
@@ -70,29 +70,29 @@ export default function BillingClient({ initialSubscription, initialPayments, us
       <div className="grid gap-6 md:grid-cols-3">
         
         {/* Active plan status */}
-        <Card className="border border-zinc-800 bg-zinc-900/60 md:col-span-2 shadow-lg backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-2xl rounded-full" />
+        <Card className="border border-white/[0.08] bg-[#14171C] md:col-span-2 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 blur-2xl rounded-full" />
           <CardHeader className="pb-4">
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle className="text-zinc-100 text-lg font-bold tracking-tight">Active Subscription</CardTitle>
-                <CardDescription className="text-xs text-zinc-400 mt-0.5">Your active account level and capabilities</CardDescription>
+                <CardTitle className="text-white text-lg font-bold tracking-tight">Active Subscription</CardTitle>
+                <CardDescription className="text-xs text-zinc-450 mt-0.5">Your active account level and capabilities</CardDescription>
               </div>
-              <Badge variant={isPro ? 'success' : 'secondary'} className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+              <Badge variant={isPro ? 'success' : 'secondary'} className="px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
                 {isPro ? 'Pro Active' : 'Free Tier'}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center space-x-4 rounded-lg bg-zinc-950/80 p-5 border border-zinc-850">
-              <div className="rounded-md bg-zinc-900 p-2.5 border border-zinc-800">
-                <CreditCard className={`h-6 w-6 ${isPro ? 'text-emerald-450' : 'text-zinc-500'}`} />
+            <div className="flex items-center space-x-4 rounded-lg bg-[#08090B] p-5 border border-white/[0.08]">
+              <div className="rounded-md bg-[#101216] p-2.5 border border-white/[0.08]">
+                <CreditCard className={`h-6 w-6 ${isPro ? 'text-[#10B981]' : 'text-zinc-500'}`} />
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-zinc-200">
                   {isPro ? SUBSCRIPTION_PLANS.pro.name : SUBSCRIPTION_PLANS.free.name}
                 </h4>
-                <p className="text-xs text-zinc-400 mt-1">
+                <p className="text-xs text-zinc-450 mt-1">
                   {isPro 
                     ? `100 generated appeals per month. Reset date: ${new Date(initialSubscription?.currentPeriodEnd).toLocaleDateString()}.`
                     : '5 generated appeals per month allocation. Upgrade to remove restrictions.'}
@@ -101,18 +101,18 @@ export default function BillingClient({ initialSubscription, initialPayments, us
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="rounded-lg bg-zinc-950/40 p-3 border border-zinc-850/50">
-                <span className="text-zinc-500 text-[10px] uppercase font-semibold tracking-wider">Billing Account</span>
+              <div className="rounded-lg bg-[#08090B]/40 p-3 border border-white/[0.06]">
+                <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">Billing Account</span>
                 <div className="mt-1 font-semibold text-zinc-300 truncate">
                   {userEmail}
                 </div>
               </div>
-              <div className="rounded-lg bg-zinc-950/40 p-3 border border-zinc-850/50">
-                <span className="text-zinc-500 text-[10px] uppercase font-semibold tracking-wider">
+              <div className="rounded-lg bg-[#08090B]/40 p-3 border border-white/[0.06]">
+                <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">
                   {isPro ? 'Renewal Date' : 'Reset Cycle'}
                 </span>
                 <div className="flex items-center space-x-1.5 mt-1 font-semibold text-zinc-300 font-mono">
-                  <Calendar className="h-3.5 w-3.5 text-zinc-400" />
+                  <Calendar className="h-3.5 w-3.5 text-zinc-450" />
                   <span>
                     {isPro 
                       ? new Date(initialSubscription?.currentPeriodEnd).toLocaleDateString()
@@ -122,14 +122,14 @@ export default function BillingClient({ initialSubscription, initialPayments, us
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between items-center bg-zinc-950/30 px-6 py-4 border-t border-zinc-850/40">
-            <span className="text-[11px] text-zinc-500">
+          <CardFooter className="flex justify-between items-center bg-[#101216]/50 px-6 py-4 border-t border-white/[0.05]">
+            <span className="text-[10px] text-zinc-550">
               {isPro 
                 ? (initialSubscription?.cancelAtPeriodEnd ? 'Subscription will cancel at end of period' : 'Auto-renews automatically')
                 : 'Upgrade below to unlock Professional Pro features'}
             </span>
             {isPro ? (
-              <Button size="sm" onClick={handleManageBilling} disabled={loading !== null} className="text-xs">
+              <Button size="sm" onClick={handleManageBilling} disabled={loading !== null} className="text-xs bg-[#101216] hover:bg-[#101216]/80 text-white font-bold h-8 border border-white/[0.08] active:scale-[0.98]">
                 {loading === 'portal' ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
@@ -140,7 +140,7 @@ export default function BillingClient({ initialSubscription, initialPayments, us
                 )}
               </Button>
             ) : (
-              <Button size="sm" onClick={handleUpgrade} disabled={loading !== null} className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium">
+              <Button size="sm" onClick={handleUpgrade} disabled={loading !== null} className="text-xs bg-[#4F8CFF] hover:bg-[#4F8CFF]/90 text-white font-bold h-8 active:scale-[0.98] shadow-lg shadow-[#4F8CFF]/10">
                 {loading === 'upgrade' ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
@@ -158,19 +158,19 @@ export default function BillingClient({ initialSubscription, initialPayments, us
         </Card>
 
         {/* Features card */}
-        <Card className="border border-zinc-800 bg-zinc-900/60 shadow-lg backdrop-blur-sm relative overflow-hidden group">
+        <Card className="border border-white/[0.08] bg-[#14171C] shadow-2xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/5 blur-2xl rounded-full" />
           <CardHeader className="pb-3">
             <div className="flex items-center space-x-2">
-              <Sparkles className="h-4.5 w-4.5 text-violet-400" />
-              <CardTitle className="text-zinc-100 text-sm font-semibold tracking-tight">Pro Plan Features</CardTitle>
+              <Sparkles className="h-4.5 w-4.5 text-[#6EE7F9]" />
+              <CardTitle className="text-white text-xs font-bold uppercase tracking-wider">Pro Plan Features</CardTitle>
             </div>
-            <CardDescription className="text-xs text-zinc-400">Unlock complete document automation capabilities</CardDescription>
+            <CardDescription className="text-xs text-zinc-450">Unlock complete document automation capabilities</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-1">
             {SUBSCRIPTION_PLANS.pro.features.map((feature) => (
               <div key={feature} className="flex items-start space-x-2 text-xs text-zinc-300">
-                <CheckCircle2 className="h-4 w-4 text-emerald-450 shrink-0 mt-0.5" />
+                <CheckCircle2 className="h-4 w-4 text-[#10B981] shrink-0 mt-0.5" />
                 <span>{feature}</span>
               </div>
             ))}
@@ -180,30 +180,30 @@ export default function BillingClient({ initialSubscription, initialPayments, us
       </div>
 
       {/* Invoice payment history list */}
-      <Card className="border border-zinc-800 bg-zinc-900/60 shadow-lg backdrop-blur-sm">
+      <Card className="border border-white/[0.08] bg-[#14171C] shadow-2xl">
         <CardHeader>
-          <CardTitle className="text-zinc-100 text-base font-bold tracking-tight">Invoice History</CardTitle>
-          <CardDescription className="text-xs text-zinc-400 mt-0.5">Chronological record of subscription payments made to your account</CardDescription>
+          <CardTitle className="text-white text-sm font-bold uppercase tracking-wider">Invoice History</CardTitle>
+          <CardDescription className="text-xs text-zinc-450 mt-0.5">Chronological record of subscription payments made to your account</CardDescription>
         </CardHeader>
         <CardContent>
           {payments.length === 0 ? (
-            <div className="rounded-md border border-dashed border-zinc-800 p-8 text-center text-xs text-zinc-500">
+            <div className="rounded-md border border-dashed border-white/[0.08] p-8 text-center text-xs text-zinc-500">
               No payments processed.
             </div>
           ) : (
-            <div className="overflow-hidden rounded-md border border-zinc-800 bg-zinc-950/40">
+            <div className="overflow-hidden rounded-md border border-white/[0.08] bg-[#08090B]/40">
               <Table>
-                <TableHeader className="bg-zinc-950">
-                  <TableRow className="border-zinc-800">
-                    <TableHead className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Date</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Amount</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Reference ID</TableHead>
+                <TableHeader className="bg-[#101216]">
+                  <TableRow className="border-white/[0.08] hover:bg-transparent">
+                    <TableHead className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Date</TableHead>
+                    <TableHead className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Amount</TableHead>
+                    <TableHead className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Reference ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {payments.map((payment) => (
-                    <TableRow key={payment.id} className="border-zinc-850 hover:bg-zinc-900/40 transition-colors">
+                    <TableRow key={payment.id} className="border-white/[0.08] hover:bg-[#101216]/40 transition-colors">
                       <TableCell className="text-xs text-zinc-300 font-mono">
                         {new Date(payment.createdAt).toLocaleDateString()}
                       </TableCell>

@@ -48,17 +48,14 @@ export default function AiAppealView({
     versions[0]?.versionNumber || 1
   );
 
-  // PDF Generation & Preview State
   const [pdfExports, setPdfExports] = useState<any[]>(initialPdfExports);
   const [selectedTemplate, setSelectedTemplate] = useState<'default' | 'professional'>('default');
   const [selectedSize, setSelectedSize] = useState<'letter' | 'a4'>('letter');
   const [pdfLoading, setPdfLoading] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Retrieve the selected version to display
   const activeVersion = versions.find((v) => v.versionNumber === activeVersionNumber) || versions[0];
 
-  // Retrieve the latest generation stats for metadata logging display
   const latestGen = aiGenerations[0] || {
     promptTokens: 0,
     completionTokens: 0,
@@ -68,7 +65,6 @@ export default function AiAppealView({
     modelUsed: 'gpt-4o',
   };
 
-  // Synchronize PDF exports on mount
   useEffect(() => {
     async function loadPdfExports() {
       try {
@@ -120,12 +116,10 @@ export default function AiAppealView({
         selectedSize
       );
       if (res.success && res.data) {
-        // Refresh export archive list
         const listRes = await getPdfExportsAction(appealId);
         if (listRes.success && listRes.data) {
           setPdfExports(listRes.data);
         }
-        // Set signed preview URL
         const urlRes = await getPdfSignedUrlAction(appealId, res.data.id);
         if (urlRes.success && urlRes.data) {
           setPreviewUrl(urlRes.data);
@@ -155,46 +149,45 @@ export default function AiAppealView({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-5 items-start">
+    <div className="grid gap-6 lg:grid-cols-5 items-start animate-in fade-in duration-300">
+      
       {/* 1. Left Viewport: Document Viewer */}
       <div className="lg:col-span-3 space-y-4">
-        <Card className="border border-zinc-800 bg-zinc-950 shadow-2xl relative overflow-hidden">
-          {/* Decorative clinical certificate header */}
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-zinc-700 via-zinc-500 to-zinc-700" />
+        <Card className="border border-white/[0.08] bg-[#14171C] shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[#4F8CFF] via-zinc-500 to-[#6EE7F9]" />
           
-          <CardHeader className="border-b border-zinc-900/60 pb-4 flex flex-row items-center justify-between">
+          <CardHeader className="border-b border-white/[0.05] pb-4 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-base font-semibold text-zinc-150 flex items-center space-x-2">
-                <FileText className="h-4.5 w-4.5 text-zinc-400" />
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-white flex items-center space-x-2">
+                <FileText className="h-4.5 w-4.5 text-[#4F8CFF]" />
                 <span>Generated Appeal Letter</span>
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs text-zinc-450">
                 Review and verify clinical formatting arguments.
               </CardDescription>
             </div>
             
-            {/* Version Badge */}
-            <span className="text-[10px] font-semibold text-emerald-450 bg-emerald-950/40 border border-emerald-900/30 px-2 py-0.5 rounded-full">
+            <span className="text-[9px] font-bold text-[#10B981] bg-[#10B981]/10 border border-[#10B981]/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
               Version {activeVersion?.versionNumber} (Latest: {versions[0]?.versionNumber})
             </span>
           </CardHeader>
 
           <CardContent className="pt-6">
             {error && (
-              <div className="mb-4 p-3 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-455">
+              <div className="mb-4 p-3 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-450">
                 {error}
               </div>
             )}
 
             {/* Letter Body Textbox */}
-            <div className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md p-6 font-mono text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto min-h-[300px]">
+            <div className="w-full bg-[#08090B] border border-white/[0.08] rounded-md p-6 font-mono text-xs text-zinc-350 leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto min-h-[300px] select-text">
               {activeVersion?.letterContent || 'No letter content has been generated.'}
             </div>
 
             {/* PDF Print Preview Frame */}
             {previewUrl && (
               <div className="mt-6 space-y-2">
-                <div className="flex justify-between items-center bg-zinc-900 border border-zinc-800 rounded px-4 py-2 text-xs">
+                <div className="flex justify-between items-center bg-[#101216] border border-white/[0.08] rounded px-4 py-2 text-xs">
                   <span className="font-semibold text-zinc-300 flex items-center">
                     <Printer className="h-3.5 w-3.5 mr-1.5 text-zinc-400" />
                     PDF Print Preview Mode
@@ -204,7 +197,7 @@ export default function AiAppealView({
                       href={previewUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center space-x-1 text-emerald-450 hover:underline"
+                      className="flex items-center space-x-1 text-[#10B981] hover:underline font-bold"
                     >
                       <span>Open in tab</span>
                       <ExternalLink className="h-3 w-3" />
@@ -217,7 +210,7 @@ export default function AiAppealView({
                     </button>
                   </div>
                 </div>
-                <div className="w-full h-[600px] border border-zinc-800 rounded-md overflow-hidden bg-zinc-900">
+                <div className="w-full h-[600px] border border-white/[0.08] rounded-md overflow-hidden bg-zinc-900">
                   <iframe
                     src={previewUrl}
                     className="w-full h-full border-none"
@@ -229,12 +222,12 @@ export default function AiAppealView({
             )}
           </CardContent>
 
-          <CardFooter className="border-t border-zinc-900/40 py-3 flex items-center justify-between text-[10px] text-zinc-500">
-            <span className="flex items-center space-x-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-zinc-500" />
+          <CardFooter className="border-t border-white/[0.05] py-3.5 flex items-center justify-between text-[10px] text-zinc-550">
+            <span className="flex items-center space-x-1.5 font-semibold">
+              <ShieldCheck className="h-4 w-4 text-[#10B981]" />
               <span>HIPAA Compliant Clinician Seal</span>
             </span>
-            <span>Generated on {activeVersion ? new Date(activeVersion.createdAt).toLocaleDateString() : 'N/A'}</span>
+            <span className="font-mono">Generated on {activeVersion ? new Date(activeVersion.createdAt).toLocaleDateString() : 'N/A'}</span>
           </CardFooter>
         </Card>
       </div>
@@ -243,35 +236,35 @@ export default function AiAppealView({
       <div className="lg:col-span-2 space-y-4">
         
         {/* Document Rendering & PDF Generation Frame */}
-        <Card className="border border-zinc-800">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
           <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center space-x-1.5">
-              <Printer className="h-4.5 w-4.5 text-zinc-400" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white flex items-center space-x-2">
+              <Printer className="h-4 w-4 text-zinc-400" />
               <span>Document Export Options</span>
             </CardTitle>
-            <CardDescription className="text-xs">Compile and export print-ready PDF formats.</CardDescription>
+            <CardDescription className="text-xs text-zinc-450">Compile and export print-ready PDF formats.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-zinc-500">Styling Template</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-bold text-zinc-455 tracking-wider">Styling Template</label>
               <select
                 value={selectedTemplate}
                 id="templateSelect"
                 onChange={(e) => setSelectedTemplate(e.target.value as any)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
+                className="w-full bg-[#08090B] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-white/[0.15]"
               >
                 <option value="default">Default Template (Modern Sans)</option>
                 <option value="professional">Professional Template (Serif Legal)</option>
               </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-zinc-500">Page Size Layout</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-bold text-zinc-455 tracking-wider">Page Size Layout</label>
               <select
                 value={selectedSize}
                 id="pageSizeSelect"
                 onChange={(e) => setSelectedSize(e.target.value as any)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
+                className="w-full bg-[#08090B] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-white/[0.15]"
               >
                 <option value="letter">US Letter Size</option>
                 <option value="a4">A4 Page Size</option>
@@ -282,10 +275,10 @@ export default function AiAppealView({
               onClick={handleGeneratePdf}
               disabled={pdfLoading || isPending}
               id="generatePdfButton"
-              className="w-full flex items-center justify-center space-x-2 bg-emerald-550 hover:bg-emerald-500 text-zinc-950"
+              className="w-full flex items-center justify-center space-x-2 bg-[#4F8CFF] hover:bg-[#4F8CFF]/90 text-white font-bold h-9 shadow-lg shadow-[#4F8CFF]/10 active:scale-[0.98]"
             >
-              <Printer className={`h-4 w-4 text-zinc-950 ${pdfLoading ? 'animate-pulse' : ''}`} />
-              <span className="font-semibold text-zinc-950">
+              <Printer className={`h-4 w-4 text-white ${pdfLoading ? 'animate-pulse' : ''}`} />
+              <span>
                 {pdfLoading ? 'Generating PDF Document...' : 'Generate PDF Document'}
               </span>
             </Button>
@@ -293,12 +286,12 @@ export default function AiAppealView({
         </Card>
 
         {/* PDF Version Archive History */}
-        <Card className="border border-zinc-800">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">PDF Export Archive History</CardTitle>
-            <CardDescription className="text-xs">Securely download generated PDF files.</CardDescription>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white">PDF Export Archive History</CardTitle>
+            <CardDescription className="text-xs text-zinc-450">Securely download generated PDF files.</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 border-t border-zinc-900/60 max-h-48 overflow-y-auto">
+          <CardContent className="p-0 border-t border-white/[0.05] max-h-48 overflow-y-auto">
             {pdfExports.length === 0 ? (
               <div className="p-4 text-center text-xs text-zinc-500">
                 No PDF documents exported yet.
@@ -307,22 +300,22 @@ export default function AiAppealView({
               pdfExports.map((exp) => (
                 <div
                   key={exp.id}
-                  className="flex w-full items-center justify-between px-4 py-3 border-b border-zinc-900/40 text-xs"
+                  className="flex w-full items-center justify-between px-4 py-3 border-b border-white/[0.05] text-xs hover:bg-white/[0.01]"
                 >
                   <div className="space-y-0.5">
-                    <p className="font-semibold text-zinc-300">
+                    <p className="font-semibold text-zinc-200">
                       PDF Export (AI v#{exp.appealVersionNumber})
                     </p>
                     <p className="text-[10px] text-zinc-500">
                       Template: {exp.templateName} ({exp.pageSize}) • {(exp.fileSize / 1024).toFixed(1)} KB
                     </p>
                   </div>
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handlePreviewPdf(exp.id)}
-                      className="h-7 text-[10px] px-2 py-0"
+                      className="h-7 text-[10px] px-2 py-0 border-white/[0.08] text-zinc-350 hover:bg-white/[0.04]"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       Preview
@@ -336,7 +329,7 @@ export default function AiAppealView({
                           window.open(urlRes.data, '_blank');
                         }
                       }}
-                      className="h-7 text-[10px] px-2 py-0 border-emerald-900/40 text-emerald-450 hover:bg-emerald-950/20"
+                      className="h-7 text-[10px] px-2 py-0 border-white/[0.08] text-[#10B981] hover:bg-[#064E3B]/20"
                     >
                       <Download className="h-3 w-3 mr-1" />
                       Get
@@ -349,49 +342,49 @@ export default function AiAppealView({
         </Card>
 
         {/* Actions panel */}
-        <Card className="border border-zinc-800">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Appeal Engine Operations</CardTitle>
-            <CardDescription className="text-xs">Trigger document actions and prompt evaluations.</CardDescription>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white">Appeal Engine Operations</CardTitle>
+            <CardDescription className="text-xs text-zinc-450">Trigger document actions and prompt evaluations.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button
               onClick={handleRegenerate}
               disabled={isPending}
-              className="w-full flex items-center justify-center space-x-2"
+              className="w-full flex items-center justify-center space-x-2 bg-[#4F8CFF] hover:bg-[#4F8CFF]/90 text-white font-bold h-9 active:scale-[0.98]"
             >
-              <RefreshCw className={`h-4 w-4 text-zinc-950 ${isPending ? 'animate-spin' : ''}`} />
-              <span className="font-semibold text-zinc-950">Regenerate Letter</span>
+              <RefreshCw className={`h-4 w-4 text-white ${isPending ? 'animate-spin' : ''}`} />
+              <span>Regenerate Letter</span>
             </Button>
           </CardContent>
         </Card>
 
         {/* Versions selector card */}
-        <Card className="border border-zinc-800">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Version History Archive</CardTitle>
-            <CardDescription className="text-xs">Roll back or restore previous clinical drafts.</CardDescription>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white">Version History Archive</CardTitle>
+            <CardDescription className="text-xs text-zinc-455">Roll back or restore previous clinical drafts.</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 border-t border-zinc-900/60 max-h-48 overflow-y-auto">
+          <CardContent className="p-0 border-t border-white/[0.05] max-h-48 overflow-y-auto">
             {versions.map((ver) => {
               const isActive = ver.versionNumber === activeVersionNumber;
               return (
                 <div
                   key={ver.id}
                   onClick={() => setActiveVersionNumber(ver.versionNumber)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left border-b border-zinc-900/40 hover:bg-zinc-900/30 transition-colors text-xs cursor-pointer"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left border-b border-white/[0.05] hover:bg-white/[0.02] transition-colors text-xs cursor-pointer"
                 >
                   <div className="space-y-0.5">
-                    <p className="font-semibold text-zinc-300">
+                    <p className="font-semibold text-zinc-200">
                       Draft Version #{ver.versionNumber} {isActive && '(Viewing)'}
                     </p>
-                    <p className="text-[10px] text-zinc-500">
+                    <p className="text-[10px] text-zinc-550 font-mono">
                       {new Date(ver.createdAt).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
                     {isActive ? (
-                      <Check className="h-4 w-4 text-emerald-450" />
+                      <Check className="h-4 w-4 text-[#10B981]" />
                     ) : (
                       <Button
                         size="sm"
@@ -401,7 +394,7 @@ export default function AiAppealView({
                           handleRollback(ver.versionNumber);
                         }}
                         disabled={isPending}
-                        className="h-7 text-[10px] px-2 py-0"
+                        className="h-7 text-[10px] px-2 py-0 border-white/[0.08] text-zinc-300 hover:text-white"
                       >
                         <Undo2 className="h-3 w-3 mr-1" />
                         Restore
@@ -415,30 +408,30 @@ export default function AiAppealView({
         </Card>
 
         {/* Audit Metrics Panel */}
-        <Card className="border border-zinc-800">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
           <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center space-x-1.5">
-              <Sparkles className="h-4 w-4 text-zinc-400" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white flex items-center space-x-2">
+              <Sparkles className="h-4 w-4 text-[#6EE7F9]" />
               <span>Generation Metadata</span>
             </CardTitle>
-            <CardDescription className="text-xs">Usage audit parameters logged for billing.</CardDescription>
+            <CardDescription className="text-xs text-zinc-450">Usage audit parameters logged for billing.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 pt-0 text-xs">
-            <div className="flex justify-between items-center py-2 border-b border-zinc-900/40 text-zinc-400">
+            <div className="flex justify-between items-center py-2.5 border-b border-white/[0.05] text-zinc-450">
               <span className="flex items-center"><Activity className="h-3.5 w-3.5 mr-1.5" /> Model Used</span>
-              <span className="font-medium text-zinc-250 font-mono">{latestGen.modelUsed || 'gpt-4o'}</span>
+              <span className="font-semibold text-zinc-200 font-mono">{latestGen.modelUsed || 'gpt-4o'}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-zinc-900/40 text-zinc-400">
+            <div className="flex justify-between items-center py-2.5 border-b border-white/[0.05] text-zinc-455">
               <span>Prompt Version</span>
-              <span className="font-medium text-zinc-250 font-mono">{latestGen.promptTemplateUsed || 'v1.0'}</span>
+              <span className="font-semibold text-zinc-200 font-mono">{latestGen.promptTemplateUsed || 'v1.0'}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-zinc-900/40 text-zinc-400">
+            <div className="flex justify-between items-center py-2.5 border-b border-white/[0.05] text-zinc-455">
               <span>Tokens Logged (Total)</span>
-              <span className="font-medium text-zinc-250 font-mono">{latestGen.totalTokens || 0}</span>
+              <span className="font-semibold text-zinc-200 font-mono">{latestGen.totalTokens || 0}</span>
             </div>
-            <div className="flex justify-between items-center py-2 text-zinc-400">
-              <span className="flex items-center"><DollarSign className="h-3.5 w-3.5 mr-1" /> Est. Cost (USD)</span>
-              <span className="font-semibold text-emerald-450 font-mono">${(latestGen.cost || 0).toFixed(5)}</span>
+            <div className="flex justify-between items-center py-2.5 text-zinc-455">
+              <span className="flex items-center"><DollarSign className="h-3.5 w-3.5 mr-1 text-[#10B981]" /> Est. Cost (USD)</span>
+              <span className="font-bold text-[#10B981] font-mono">${(latestGen.cost || 0).toFixed(5)}</span>
             </div>
           </CardContent>
         </Card>

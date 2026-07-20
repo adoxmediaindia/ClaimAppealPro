@@ -17,56 +17,68 @@ module.exports = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: "rgba(255, 255, 255, 0.08)",
+        input: "rgba(255, 255, 255, 0.06)",
+        ring: "#4F8CFF",
+        background: "#08090B",
+        foreground: "#F3F4F6",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#4F8CFF",
+          foreground: "#08090B",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#101216",
+          foreground: "#F3F4F6",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "#EF4444",
+          foreground: "#FFFFFF",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "#101216",
+          foreground: "#94A3B8",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#14171C",
+          foreground: "#F3F4F6",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "#14171C",
+          foreground: "#F3F4F6",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        // Mapped custom classes used in the codebase to make styling compile properly
-        emerald: {
-          450: '#34d399', // Emerald 400
-          955: '#022c22', // Emerald 950
-        },
-        rose: {
-          450: '#f43f5e', // Rose 500
-          455: '#fda4af', // Rose 300
-          955: '#4c0519', // Rose 950
+          DEFAULT: "#14171C",
+          foreground: "#F3F4F6",
         },
         zinc: {
-          405: '#a1a1aa', // Zinc 400
-          450: '#71717a', // Zinc 500
-          505: '#52525b', // Zinc 600
-          550: '#3f3f46', // Zinc 700
-          650: '#27272a', // Zinc 800
-          850: '#18181b', // Zinc 900
+          50: '#FAFAFA',
+          100: '#F4F4F5',
+          200: '#E4E4E7',
+          300: '#D4D4D8',
+          400: '#A1A1AA',
+          405: '#A1A1AA',
+          450: '#71717A',
+          500: '#71717A',
+          505: '#52525B',
+          550: '#3F3F46',
+          600: '#52525B',
+          650: '#27272A',
+          700: '#3F3F46',
+          800: '#14171C', // Card background color
+          850: '#14171C', // Card background color
+          900: '#101216', // Secondary background color
+          950: '#08090B', // Primary background color
+        },
+        emerald: {
+          450: '#10B981', // Success color
+          500: '#10B981',
+          955: '#064E3B',
+        },
+        rose: {
+          450: '#EF4444', // Error color
+          455: '#FCA5A5',
+          500: '#EF4444',
+          955: '#7F1D1D',
         }
       },
       borderRadius: {

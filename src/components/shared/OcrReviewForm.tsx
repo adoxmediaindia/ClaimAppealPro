@@ -11,7 +11,6 @@ import { updateAppealStructuredData } from '@/app/actions/ocr';
 import { generateAppealAction } from '@/app/actions/ai';
 import { type OcrWarning } from '@/lib/ocr/validator';
 
-
 const appealReviewSchema = z.object({
   patientName: z.string().min(1, 'Patient Name is required.'),
   insuranceCompany: z.string().min(1, 'Insurance Company is required.'),
@@ -49,7 +48,6 @@ export default function OcrReviewForm({
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
 
   const initialFields = {
     patientName: initialData.patientName?.value || '',
@@ -112,11 +110,9 @@ export default function OcrReviewForm({
           setError(genResponse.error?.message || 'Metadata updated, but AI appeal draft generation encountered an issue.');
         }
       } else {
-
         setError(response.error?.message || 'Failed to update appeal metadata details.');
       }
     });
-
   };
 
   const hasWarning = (fieldKey: string) => {
@@ -132,28 +128,28 @@ export default function OcrReviewForm({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-5 items-start">
+    <div className="grid gap-6 lg:grid-cols-5 items-start animate-in fade-in duration-300">
       
       {/* 1. Left Viewport: Document Preview Metadata */}
       <div className="lg:col-span-2 space-y-4">
-        <Card className="border border-zinc-800">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Document Reference Source</CardTitle>
-            <CardDescription className="text-xs">Original file scanned for claim denial parameters.</CardDescription>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white">Document Reference Source</CardTitle>
+            <CardDescription className="text-xs text-zinc-450">Original file scanned for claim denial parameters.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center space-x-3 rounded bg-zinc-950 p-4 border border-zinc-850">
-              <FileText className="h-6 w-6 text-zinc-400 shrink-0" />
+            <div className="flex items-center space-x-3 rounded bg-[#08090B] p-4 border border-white/[0.08]">
+              <FileText className="h-6 w-6 text-zinc-450 shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-zinc-200 truncate">{fileName}</p>
-                <p className="text-[10px] text-zinc-500">Secure signed download link available.</p>
+                <p className="text-[10px] text-zinc-550">Secure signed download link available.</p>
               </div>
             </div>
             <a
               href={fileDownloadUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center justify-center space-x-2 rounded-md border border-zinc-850 bg-zinc-900 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+              className="flex w-full items-center justify-center space-x-2 rounded-md border border-white/[0.08] bg-[#101216] py-2.5 text-xs text-zinc-300 hover:bg-[#101216]/80 hover:text-white transition-colors h-9 font-semibold"
             >
               <Download className="h-4 w-4" />
               <span>Download Original PDF File</span>
@@ -163,17 +159,17 @@ export default function OcrReviewForm({
 
         {/* Validation Warning Alert Panel */}
         {warnings.length > 0 && (
-          <Card className="border border-amber-900/50 bg-amber-950/10">
+          <Card className="border border-amber-900/40 bg-amber-950/10">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
-                <AlertTriangle className="h-4 w-4 text-amber-500 mr-2" />
+              <CardTitle className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider flex items-center">
+                <AlertTriangle className="h-4 w-4 text-[#F59E0B] mr-2" />
                 <span>Verification Warnings ({warnings.length})</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {warnings.map((w, index) => (
-                <div key={index} className="text-[11px] text-amber-350 flex items-start space-x-1.5">
-                  <span className="text-amber-500 shrink-0 mt-0.5">•</span>
+                <div key={index} className="text-[11px] text-[#F59E0B]/90 flex items-start space-x-1.5 leading-normal">
+                  <span className="text-[#F59E0B] shrink-0 mt-0.5">•</span>
                   <span>{w.message}</span>
                 </div>
               ))}
@@ -184,21 +180,21 @@ export default function OcrReviewForm({
 
       {/* 2. Right Viewport: Structured Edit Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="lg:col-span-3 space-y-6">
-        <Card className="border border-zinc-800">
-          <CardHeader className="border-b border-zinc-850 pb-4">
-            <CardTitle className="text-base font-semibold">Structured Claim Metadata</CardTitle>
-            <CardDescription className="text-xs">
+        <Card className="border border-white/[0.08] bg-[#14171C]">
+          <CardHeader className="border-b border-white/[0.05] pb-4">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white">Structured Claim Metadata</CardTitle>
+            <CardDescription className="text-xs text-zinc-455">
               Verify and edit every value before starting AI letter generations.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             {error && (
-              <div className="p-3 text-xs rounded border border-rose-900 bg-rose-950/30 text-rose-450">
+              <div className="p-3 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-450 animate-in fade-in">
                 {error}
               </div>
             )}
             {success && (
-              <div className="p-3 text-xs rounded border border-emerald-900 bg-emerald-950/30 text-emerald-450">
+              <div className="p-3 text-xs rounded border border-emerald-900 bg-[#064E3B]/20 text-[#10B981] animate-in fade-in">
                 Structured values saved successfully. Routing back to appeals overview...
               </div>
             )}
@@ -206,11 +202,11 @@ export default function OcrReviewForm({
             <div className="grid gap-4 sm:grid-cols-2">
               
               {/* Patient Name */}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label htmlFor="patientName" className="text-[11px] font-semibold text-zinc-400">Patient Name</label>
+                  <label htmlFor="patientName" className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider">Patient Name</label>
                   {getConfidenceText('patientName') && (
-                    <span className="text-[9px] text-amber-400 bg-amber-950/40 border border-amber-900/30 px-1 rounded">
+                    <span className="text-[9px] text-[#F59E0B] bg-amber-950/20 border border-amber-900/30 px-1.5 py-0.5 rounded">
                       {getConfidenceText('patientName')}
                     </span>
                   )}
@@ -219,20 +215,22 @@ export default function OcrReviewForm({
                   id="patientName"
                   type="text"
                   {...register('patientName')}
-                  className={`w-full px-3 py-2 text-xs rounded border bg-zinc-950 text-zinc-200 focus:outline-none ${
-                    hasWarning('patientName') ? 'border-amber-900/80 focus:ring-1 focus:ring-amber-500' : 'border-zinc-800 focus:ring-1 focus:ring-zinc-400'
-                  }`}
+                  className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none ${
+                    hasWarning('patientName') 
+                      ? 'border-amber-900/60 focus:border-[#F59E0B]/50 focus:ring-1 focus:ring-[#F59E0B]/30' 
+                      : 'border-white/[0.08] focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30'
+                  } transition-all`}
                   disabled={isPending}
                 />
-                {errors.patientName?.message && <p className="text-[10px] text-rose-455">{errors.patientName.message as string}</p>}
+                {errors.patientName?.message && <p className="text-[10px] text-rose-450 mt-1">{errors.patientName.message as string}</p>}
               </div>
 
               {/* Insurance payor */}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label htmlFor="insuranceCompany" className="text-[11px] font-semibold text-zinc-400">Insurance Payor</label>
+                  <label htmlFor="insuranceCompany" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Insurance Payor</label>
                   {getConfidenceText('insuranceCompany') && (
-                    <span className="text-[9px] text-amber-400 bg-amber-950/40 border border-amber-900/30 px-1 rounded">
+                    <span className="text-[9px] text-[#F59E0B] bg-amber-950/20 border border-amber-900/30 px-1.5 py-0.5 rounded">
                       {getConfidenceText('insuranceCompany')}
                     </span>
                   )}
@@ -241,195 +239,205 @@ export default function OcrReviewForm({
                   id="insuranceCompany"
                   type="text"
                   {...register('insuranceCompany')}
-                  className={`w-full px-3 py-2 text-xs rounded border bg-zinc-950 text-zinc-200 focus:outline-none ${
-                    hasWarning('insuranceCompany') ? 'border-amber-900/80 focus:ring-1 focus:ring-amber-500' : 'border-zinc-800 focus:ring-1 focus:ring-zinc-400'
-                  }`}
+                  className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none ${
+                    hasWarning('insuranceCompany') 
+                      ? 'border-amber-900/60 focus:border-[#F59E0B]/50 focus:ring-1 focus:ring-[#F59E0B]/30' 
+                      : 'border-white/[0.08] focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30'
+                  } transition-all`}
                   disabled={isPending}
                 />
-                {errors.insuranceCompany?.message && <p className="text-[10px] text-rose-455">{errors.insuranceCompany.message as string}</p>}
+                {errors.insuranceCompany?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.insuranceCompany.message as string}</p>}
               </div>
 
               {/* Claim ID */}
-              <div className="space-y-1">
-                <label htmlFor="claimNumber" className="text-[11px] font-semibold text-zinc-400">Claim ID / Number</label>
+              <div className="space-y-1.5">
+                <label htmlFor="claimNumber" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Claim ID / Number</label>
                 <input
                   id="claimNumber"
                   type="text"
                   {...register('claimNumber')}
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
-                {errors.claimNumber?.message && <p className="text-[10px] text-rose-455">{errors.claimNumber.message as string}</p>}
+                {errors.claimNumber?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.claimNumber.message as string}</p>}
               </div>
 
               {/* Member ID */}
-              <div className="space-y-1">
-                <label htmlFor="memberId" className="text-[11px] font-semibold text-zinc-400">Member ID</label>
+              <div className="space-y-1.5">
+                <label htmlFor="memberId" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Member ID</label>
                 <input
                   id="memberId"
                   type="text"
                   {...register('memberId')}
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
-                {errors.memberId?.message && <p className="text-[10px] text-rose-455">{errors.memberId.message as string}</p>}
+                {errors.memberId?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.memberId.message as string}</p>}
               </div>
 
               {/* Policy Number */}
-              <div className="space-y-1">
-                <label htmlFor="policyNumber" className="text-[11px] font-semibold text-zinc-400">Policy Number</label>
+              <div className="space-y-1.5">
+                <label htmlFor="policyNumber" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Policy Number</label>
                 <input
                   id="policyNumber"
                   type="text"
                   {...register('policyNumber')}
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
-                {errors.policyNumber?.message && <p className="text-[10px] text-rose-455">{errors.policyNumber.message as string}</p>}
+                {errors.policyNumber?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.policyNumber.message as string}</p>}
               </div>
 
               {/* Provider Name */}
-              <div className="space-y-1">
-                <label htmlFor="providerName" className="text-[11px] font-semibold text-zinc-400">Provider Doctor Name</label>
+              <div className="space-y-1.5">
+                <label htmlFor="providerName" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Provider Doctor Name</label>
                 <input
                   id="providerName"
                   type="text"
                   {...register('providerName')}
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
-                {errors.providerName?.message && <p className="text-[10px] text-rose-455">{errors.providerName.message as string}</p>}
+                {errors.providerName?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.providerName.message as string}</p>}
               </div>
 
               {/* DOS Date */}
-              <div className="space-y-1">
-                <label htmlFor="dateOfService" className="text-[11px] font-semibold text-zinc-400">Date of Service (YYYY-MM-DD)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="dateOfService" className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider">Date of Service (YYYY-MM-DD)</label>
                 <input
                   id="dateOfService"
                   type="text"
                   {...register('dateOfService')}
-                  className={`w-full px-3 py-2 text-xs rounded border bg-zinc-950 text-zinc-200 focus:outline-none ${
-                    hasWarning('dateOfService') ? 'border-amber-900/80 focus:ring-1 focus:ring-amber-500' : 'border-zinc-800 focus:ring-1 focus:ring-zinc-400'
-                  }`}
+                  className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none ${
+                    hasWarning('dateOfService') 
+                      ? 'border-amber-900/60 focus:border-[#F59E0B]/50 focus:ring-1 focus:ring-[#F59E0B]/30' 
+                      : 'border-white/[0.08] focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30'
+                  } transition-all`}
                   placeholder="YYYY-MM-DD"
                   disabled={isPending}
                 />
-                {errors.dateOfService?.message && <p className="text-[10px] text-rose-455">{errors.dateOfService.message as string}</p>}
+                {errors.dateOfService?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.dateOfService.message as string}</p>}
               </div>
 
               {/* Denial Date */}
-              <div className="space-y-1">
-                <label htmlFor="denialDate" className="text-[11px] font-semibold text-zinc-400">Denial Date (YYYY-MM-DD)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="denialDate" className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider">Denial Date (YYYY-MM-DD)</label>
                 <input
                   id="denialDate"
                   type="text"
                   {...register('denialDate')}
-                  className={`w-full px-3 py-2 text-xs rounded border bg-zinc-950 text-zinc-200 focus:outline-none ${
-                    hasWarning('denialDate') ? 'border-amber-900/80 focus:ring-1 focus:ring-amber-500' : 'border-zinc-800 focus:ring-1 focus:ring-zinc-400'
-                  }`}
+                  className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none ${
+                    hasWarning('denialDate') 
+                      ? 'border-amber-900/60 focus:border-[#F59E0B]/50 focus:ring-1 focus:ring-[#F59E0B]/30' 
+                      : 'border-white/[0.08] focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30'
+                  } transition-all`}
                   placeholder="YYYY-MM-DD"
                   disabled={isPending}
                 />
-                {errors.denialDate?.message && <p className="text-[10px] text-rose-455">{errors.denialDate.message as string}</p>}
+                {errors.denialDate?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.denialDate.message as string}</p>}
               </div>
 
               {/* CPT Codes */}
-              <div className="space-y-1">
-                <label htmlFor="cptCodes" className="text-[11px] font-semibold text-zinc-400">CPT Billing Codes (comma separated)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="cptCodes" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">CPT Billing Codes (comma separated)</label>
                 <input
                   id="cptCodes"
                   type="text"
                   {...register('cptCodes')}
                   placeholder="e.g. 99214, 93000"
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
               </div>
 
               {/* ICD Codes */}
-              <div className="space-y-1">
-                <label htmlFor="icdCodes" className="text-[11px] font-semibold text-zinc-400">ICD Diagnosis Codes (comma separated)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="icdCodes" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">ICD Diagnosis Codes (comma separated)</label>
                 <input
                   id="icdCodes"
                   type="text"
                   {...register('icdCodes')}
                   placeholder="e.g. I10, E11.9"
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
               </div>
 
               {/* Appeal Deadline */}
-              <div className="space-y-1">
-                <label htmlFor="appealDeadline" className="text-[11px] font-semibold text-zinc-400">Appeal Submission Deadline (YYYY-MM-DD)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="appealDeadline" className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider">Appeal Submission Deadline (YYYY-MM-DD)</label>
                 <input
                   id="appealDeadline"
                   type="text"
                   {...register('appealDeadline')}
-                  className={`w-full px-3 py-2 text-xs rounded border bg-zinc-950 text-zinc-200 focus:outline-none ${
-                    hasWarning('appealDeadline') ? 'border-amber-900/80 focus:ring-1 focus:ring-amber-500' : 'border-zinc-800 focus:ring-1 focus:ring-zinc-400'
-                  }`}
+                  className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none ${
+                    hasWarning('appealDeadline') 
+                      ? 'border-amber-900/60 focus:border-[#F59E0B]/50 focus:ring-1 focus:ring-[#F59E0B]/30' 
+                      : 'border-white/[0.08] focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30'
+                  } transition-all`}
                   placeholder="YYYY-MM-DD"
                   disabled={isPending}
                 />
-                {errors.appealDeadline?.message && <p className="text-[10px] text-rose-455">{errors.appealDeadline.message as string}</p>}
+                {errors.appealDeadline?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.appealDeadline.message as string}</p>}
               </div>
 
               {/* Contact Information */}
-              <div className="space-y-1">
-                <label htmlFor="contactInformation" className="text-[11px] font-semibold text-zinc-400">Insurance Contact Phone</label>
+              <div className="space-y-1.5">
+                <label htmlFor="contactInformation" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Insurance Contact Phone</label>
                 <input
                   id="contactInformation"
                   type="text"
                   {...register('contactInformation')}
-                  className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                   disabled={isPending}
                 />
-                {errors.contactInformation?.message && <p className="text-[10px] text-rose-455">{errors.contactInformation.message as string}</p>}
+                {errors.contactInformation?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.contactInformation.message as string}</p>}
               </div>
 
             </div>
 
             {/* Denial Reason detail text */}
-            <div className="space-y-1">
-              <label htmlFor="denialReason" className="text-[11px] font-semibold text-zinc-400">Insurance Denial Reason</label>
+            <div className="space-y-1.5">
+              <label htmlFor="denialReason" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Insurance Denial Reason</label>
               <textarea
                 id="denialReason"
                 rows={3}
                 {...register('denialReason')}
-                className={`w-full px-3 py-2 text-xs rounded border bg-zinc-950 text-zinc-200 focus:outline-none ${
-                  hasWarning('denialReason') ? 'border-amber-900/80 focus:ring-1 focus:ring-amber-500' : 'border-zinc-800 focus:ring-1 focus:ring-zinc-400'
-                }`}
+                className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none ${
+                  hasWarning('denialReason') 
+                    ? 'border-amber-900/60 focus:border-[#F59E0B]/50 focus:ring-1 focus:ring-[#F59E0B]/30' 
+                    : 'border-white/[0.08] focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30'
+                } transition-all`}
                 disabled={isPending}
               />
-              {errors.denialReason?.message && <p className="text-[10px] text-rose-455">{errors.denialReason.message as string}</p>}
+              {errors.denialReason?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.denialReason.message as string}</p>}
             </div>
 
             {/* Address */}
-            <div className="space-y-1">
-              <label htmlFor="address" className="text-[11px] font-semibold text-zinc-400">Insurance Appeal Mailing Address</label>
+            <div className="space-y-1.5">
+              <label htmlFor="address" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Insurance Appeal Mailing Address</label>
               <input
                 id="address"
                 type="text"
                 {...register('address')}
-                className="w-full px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-950 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-full px-3 py-2 text-xs rounded border border-white/[0.08] bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all"
                 disabled={isPending}
               />
-              {errors.address?.message && <p className="text-[10px] text-rose-455">{errors.address.message as string}</p>}
+              {errors.address?.message && <p className="text-[10px] text-rose-455 mt-1">{errors.address.message as string}</p>}
             </div>
 
           </CardContent>
-          <CardFooter className="flex justify-end bg-zinc-950/20 border-t border-zinc-850 p-4">
-            <Button type="submit" disabled={isPending} className="flex items-center space-x-2">
+          <CardFooter className="flex justify-end bg-[#101216]/50 border-t border-white/[0.05] p-4">
+            <Button type="submit" disabled={isPending} className="flex items-center space-x-2 bg-[#4F8CFF] hover:bg-[#4F8CFF]/90 text-white font-bold h-9">
               {isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
-                  <span className="text-zinc-950">Saving structured data...</span>
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <span>Saving structured data...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="h-4 w-4 text-zinc-950" />
-                  <span className="font-semibold text-zinc-955">Verify & Proceed</span>
+                  <CheckCircle2 className="h-4 w-4 text-white" />
+                  <span>Verify & Proceed</span>
                 </>
               )}
             </Button>
