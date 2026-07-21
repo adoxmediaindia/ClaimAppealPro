@@ -3,6 +3,7 @@ import { AiProvider, AppealResult } from './provider';
 import { PromptBuilder } from './promptBuilder';
 import { AppealFormatter } from './formatter';
 import log from '@/lib/logger';
+import { ApiError } from '@/lib/errors';
 
 export class OpenAiProvider implements AiProvider {
   private client: OpenAI | null = null;
@@ -11,11 +12,10 @@ export class OpenAiProvider implements AiProvider {
   private getClient(): OpenAI {
     if (!this.client) {
       const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey || apiKey === 'sk-proj-your-openai-key') {
-        log.warn({}, 'Using placeholder or empty OpenAI API Key. Real completions will be mocked.');
-
+      if (!apiKey || apiKey.includes('your-openai-key')) {
+        throw new ApiError(400, 'OPENAI_KEY_MISSING', 'OPENAI_API_KEY is not configured in environment variables.');
       }
-      this.client = new OpenAI({ apiKey: apiKey || 'mock-key' });
+      this.client = new OpenAI({ apiKey });
     }
     return this.client;
   }
@@ -27,57 +27,18 @@ export class OpenAiProvider implements AiProvider {
     const correlationId = crypto.randomUUID();
     log.info({ correlationId, promptVersion }, 'Starting OpenAI appeal letter generation');
 
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey || apiKey.includes('your-openai-key')) {
+      throw new ApiError(400, 'OPENAI_KEY_MISSING', 'OPENAI_API_KEY is not configured.');
+    }
+
     const builder = new PromptBuilder();
     const prompt = builder.build(metadata, promptVersion);
     const formatter = new AppealFormatter();
 
-    // Offline bypass wrapper for testing / placeholder credentials
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (
-      process.env.NODE_ENV === 'test' ||
-      !apiKey ||
-      apiKey === 'sk-proj-your-openai-key'
-    ) {
-      log.info({ correlationId }, 'Executing AI generation in offline mock mode');
-      
-      const extractVal = (field: any): string => {
-        if (field && typeof field === 'object' && 'value' in field) {
-          return String(field.value);
-        }
-        return field ? String(field) : '';
-      };
-
-      const resolvedPatientName = extractVal(metadata.patientName) || 'Patient';
-      const resolvedClaimNumber = extractVal(metadata.claimNumber) || 'N/A';
-      const resolvedDenialDate = extractVal(metadata.denialDate) || 'recently';
-
-      const mockResult: AppealResult = {
-        title: `Insurance Appeal for ${resolvedPatientName} - Claim #${resolvedClaimNumber}`,
-        executiveSummary: `This is a formal appeal letter requesting reconsideration of the denial for claim reference #${resolvedClaimNumber} for patient ${resolvedPatientName}. The service was medically necessary.`,
-        medicalNecessity: 'The patient presents with clinical indications that strongly warrant the requested therapy. Standard treatments have failed or are contraindicated. Professional guidelines recommend this pathway.',
-        policyArgument: 'Under Section 4.2 of the member policy handbook, the requested clinical service matches covered benefits criteria. Pre-authorization criteria are fully met.',
-        supportingEvidence: `Exhibits include primary physician notes dated ${resolvedDenialDate} and relevant peer-reviewed clinical articles.`,
-        closingRequest: 'We request immediate reversal of this denial and expedited approval for the requested clinical services.',
-        formattedLetter: '',
-        usage: {
-          promptTokens: 150,
-          completionTokens: 320,
-          totalTokens: 470,
-          cost: 0.0035,
-        },
-        modelUsed: `${this.model} (Mock)`,
-      };
-
-
-      // Compile formatted letter using shared Formatter
-      mockResult.formattedLetter = formatter.format(mockResult);
-      return mockResult;
-    }
-
     try {
       const client = this.getClient();
       
-      // OpenAI Chat Completion with 15-second timeout
       const response = await Promise.race([
         client.chat.completions.create({
           model: this.model,
@@ -106,19 +67,18 @@ Ensure all keys are populated and no values are empty or truncated.`,
           temperature: 0.2,
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('OpenAI request timed out after 15 seconds.')), 15000)
+          setTimeout(() => reject(new ApiError(504, 'OPENAI_TIMEOUT', 'OpenAI request timed out after 15 seconds.')), 15000)
         ),
       ]);
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        throw new Error('OpenAI returned an empty completion response.');
+        throw new ApiError(500, 'OPENAI_EMPTY_RESPONSE', 'OpenAI returned an empty completion response.');
       }
 
       const parsed = JSON.parse(content);
       const usage = response.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
       
-      // Calculate dynamic gpt-4o cost: $2.50 / 1M input, $10.00 / 1M output
       const promptTokens = usage.prompt_tokens;
       const completionTokens = usage.completion_tokens;
       const totalTokens = usage.total_tokens;
@@ -141,9 +101,7 @@ Ensure all keys are populated and no values are empty or truncated.`,
         modelUsed: this.model,
       };
 
-      // Compile formatted letter using shared Formatter
       result.formattedLetter = formatter.format(result);
-
       log.info({ correlationId, totalTokens, cost }, 'OpenAI appeal letter generation succeeded');
       return result;
     } catch (error: any) {

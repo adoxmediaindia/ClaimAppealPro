@@ -1,41 +1,29 @@
 import Stripe from 'stripe';
 import { BillingProvider, CheckoutSessionParams, BillingEvent } from './provider';
 import log from '@/lib/logger';
+import { ApiError } from '@/lib/errors';
 
 export class StripeBillingProvider implements BillingProvider {
-  private stripe: Stripe;
+  private stripe: Stripe | null = null;
 
-  constructor() {
-    const secretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_mock-stripe-secret-key';
-    this.stripe = new Stripe(secretKey, {
-      apiVersion: '2024-04-10' as any, // Stable API Version
-    });
-  }
-
-  private isMockMode(): boolean {
-    const key = process.env.STRIPE_SECRET_KEY || '';
-    return (
-      process.env.NODE_ENV === 'test' ||
-      key === 'sk_test_mock-stripe-secret-key' ||
-      key === 'sk_test_your-stripe-key' ||
-      key.includes('your-stripe-key') ||
-      key.includes('mock')
-    );
+  private getStripe(): Stripe {
+    if (!this.stripe) {
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      if (!secretKey || secretKey.includes('your-stripe-key')) {
+        throw new ApiError(400, 'STRIPE_KEY_MISSING', 'Stripe payment gateway is not configured.');
+      }
+      this.stripe = new Stripe(secretKey, {
+        apiVersion: '2024-04-10' as any,
+      });
+    }
+    return this.stripe;
   }
 
   async createCheckoutSession(params: CheckoutSessionParams): Promise<{ url: string; sessionId: string }> {
     log.info({ userId: params.userId, email: params.email }, 'Creating Stripe checkout session');
-    
-    // Offline / Mock check bypass for testing
-    if (this.isMockMode()) {
-      log.info({}, 'Executing mock Stripe checkout session creation');
-      return {
-        url: `${params.successUrl}?session_id=mock_session_${crypto.randomUUID()}`,
-        sessionId: `mock_session_${crypto.randomUUID()}`,
-      };
-    }
+    const stripe = this.getStripe();
 
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
@@ -53,7 +41,7 @@ export class StripeBillingProvider implements BillingProvider {
     });
 
     if (!session.url) {
-      throw new Error('Stripe failed to return a checkout session URL.');
+      throw new ApiError(500, 'STRIPE_SESSION_ERROR', 'Stripe failed to return a checkout session URL.');
     }
 
     return {
@@ -64,15 +52,9 @@ export class StripeBillingProvider implements BillingProvider {
 
   async createPortalSession(stripeCustomerId: string, returnUrl: string): Promise<{ url: string }> {
     log.info({ stripeCustomerId }, 'Creating Stripe customer portal session');
+    const stripe = this.getStripe();
 
-    if (this.isMockMode()) {
-      log.info({}, 'Executing mock Stripe customer portal session creation');
-      return {
-        url: returnUrl,
-      };
-    }
-
-    const session = await this.stripe.billingPortal.sessions.create({
+    const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: returnUrl,
     });
@@ -84,18 +66,13 @@ export class StripeBillingProvider implements BillingProvider {
 
   async constructWebhookEvent(rawBody: string, signature: string, secret: string): Promise<BillingEvent> {
     log.info({}, 'Verifying Stripe webhook event signature');
+    const stripe = this.getStripe();
 
-    if (this.isMockMode()) {
-      log.info({}, 'Executing mock Stripe webhook event verification');
-      try {
-        const parsed = JSON.parse(rawBody);
-        return this.mapStripeEventToBillingEvent(parsed);
-      } catch (err: any) {
-        throw new Error(`Failed to parse mock webhook body: ${err.message}`);
-      }
+    if (!secret) {
+      throw new ApiError(400, 'STRIPE_WEBHOOK_SECRET_MISSING', 'Stripe webhook secret is not configured.');
     }
 
-    const event = this.stripe.webhooks.constructEvent(rawBody, signature, secret);
+    const event = stripe.webhooks.constructEvent(rawBody, signature, secret);
     return this.mapStripeEventToBillingEvent(event);
   }
 

@@ -1,12 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 const realPrisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
-const scratchDir = 'C:\\Users\\prati\\.gemini\\antigravity\\brain\\99ddbc12-2335-4f25-804f-324c844e6864\\scratch';
+const scratchDir = path.join(os.tmpdir(), 'claimappealpro_mock_db');
 const stateFilePath = path.join(scratchDir, 'mock_db_state.json');
 
 // Ensure scratch directory exists

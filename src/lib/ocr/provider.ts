@@ -25,14 +25,14 @@ export interface OcrProvider {
  * Primary OCR Provider utilizing Mistral OCR REST API.
  */
 export class MistralOcrProvider implements OcrProvider {
-  private apiKey = config.MISTRAL_API_KEY;
   private endpoint = 'https://api.mistral.ai/v1/ocr';
 
   async extract(fileBuffer: Buffer, mimeType: string): Promise<OcrResult> {
     const correlationId = crypto.randomUUID();
     log.info({ correlationId, mimeType }, 'Initiating Mistral OCR extraction');
+    const apiKey = process.env.MISTRAL_API_KEY || config.MISTRAL_API_KEY;
 
-    if (!this.apiKey) {
+    if (!apiKey) {
       log.warn({ correlationId }, 'Mistral API key is missing. Skipping to fallback provider');
       throw new ApiError(401, 'MISTRAL_KEY_MISSING', 'Mistral API Key is not configured.');
     }
@@ -55,7 +55,7 @@ export class MistralOcrProvider implements OcrProvider {
         method: 'POST',
         headers: {
           'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: requestBody as any,
       });

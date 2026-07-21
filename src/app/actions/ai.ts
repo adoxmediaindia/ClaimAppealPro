@@ -2,8 +2,7 @@
 
 import { createServerSideClient } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
-import { OpenAiProvider } from '@/lib/ai/openai';
-import { ResponseValidator } from '@/lib/ai/validator';
+import { getAiProvider, ResponseValidator } from '@/lib/ai';
 import { ValidationError, UnauthorizedError, ApiError } from '@/lib/errors';
 import { getPlanById } from '@/lib/billing/plans';
 
@@ -79,8 +78,8 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
 
     const structuredInput = (appeal.structuredInput as Record<string, any>) || {};
 
-    // 2. Call OpenAI Provider with retry wrapper
-    const provider = new OpenAiProvider();
+    // 2. Call AI Provider with retry wrapper
+    const provider = getAiProvider();
     const validator = new ResponseValidator();
     
     let result: any = null;

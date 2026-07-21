@@ -1,13 +1,18 @@
 import { BillingProvider } from './provider';
 import { StripeBillingProvider } from './stripe';
+import { NullBillingProvider } from './nullBilling';
 
-let activeProvider: BillingProvider | null = null;
+export * from './provider';
+export * from './plans';
 
 export const getBillingProvider = (): BillingProvider => {
-  if (!activeProvider) {
-    activeProvider = new StripeBillingProvider();
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+
+  if (stripeKey && stripeKey.trim() !== '' && !stripeKey.includes('your-stripe-key')) {
+    return new StripeBillingProvider();
   }
-  return activeProvider;
+
+  return new NullBillingProvider();
 };
 
 export default getBillingProvider;
