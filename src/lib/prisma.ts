@@ -333,12 +333,25 @@ const createMockModel = (modelName: string) => {
       return record || { id: 'mock-id' };
     },
     delete: async (args: any) => ({ id: args?.where?.id || 'mock-id' }),
-    count: async () => {
+    count: async (_args?: any) => {
       const state = getMockState();
       if (modelName === 'user') {
         return state.users ? state.users.length : 1;
       }
+      if (modelName === 'appeal') {
+        return state.appeal ? 1 : 0;
+      }
       return 0;
+    },
+    aggregate: async (_args?: any) => {
+      if (modelName === 'usageLog') {
+        return {
+          _sum: {
+            tokenCount: 0,
+          },
+        };
+      }
+      return { _sum: {} };
     },
   };
 };
