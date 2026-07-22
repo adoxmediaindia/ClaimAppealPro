@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, Search, Bell, User, CreditCard, LogOut, ChevronDown, Check, Info, AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
+import { Menu, Search, Bell, User, CreditCard, LogOut, ChevronDown, Info, AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { logoutUser } from '@/app/actions/auth';
 import { useRouter } from 'next/navigation';

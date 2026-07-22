@@ -3,6 +3,7 @@
 import React, { useState, useRef, useTransition } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, RefreshCw, Loader2, ArrowRight } from 'lucide-react';
 import { getPresignedUploadUrl, registerUploadedFile, deleteUploadedFile } from '@/app/actions/upload';
 import { useRouter } from 'next/navigation';

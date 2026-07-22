@@ -6,6 +6,7 @@ import { ValidationError, ApiError, DatabaseError, UnauthorizedError } from '@/l
 import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import config from '@/config';
+import { sendWelcomeEmail } from '@/lib/email/templates';
 
 export interface ActionResponse<T> {
   success: boolean;
@@ -91,6 +92,11 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         });
       });
       log.info({ correlationId, userId: supabaseUser.id }, 'Public schema synchronized successfully via Prisma transaction');
+
+      // Send welcome email (non-blocking)
+      sendWelcomeEmail(email, firstName).catch((err) => {
+        log.error({ correlationId, error: err.message }, 'Failed to dispatch welcome email');
+      });
     } catch (dbError) {
       log.error({ correlationId, userId: supabaseUser.id }, 'Prisma synchronization failed during registration', dbError);
       throw new DatabaseError(dbError);

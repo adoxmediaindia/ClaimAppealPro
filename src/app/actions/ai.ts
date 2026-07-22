@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getAiProvider, ResponseValidator } from '@/lib/ai';
 import { ValidationError, UnauthorizedError, ApiError } from '@/lib/errors';
 import { getPlanById } from '@/lib/billing/plans';
+import { sendAppealReadyEmail } from '@/lib/email/templates';
 
 import log from '@/lib/logger';
 
@@ -181,6 +182,13 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
         },
       });
     });
+
+    // Trigger ready notification & email (non-blocking)
+    if (user.email) {
+      sendAppealReadyEmail(user.email, user.id, appeal.id).catch((err) => {
+        log.error({ correlationId, error: err.message }, 'Failed to dispatch appeal ready notification');
+      });
+    }
 
     log.info(
       { correlationId, appealId, version: nextVersion },
