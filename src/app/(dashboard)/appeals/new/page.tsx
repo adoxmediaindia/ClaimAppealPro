@@ -3,7 +3,7 @@
 import React, { useState, useRef, useTransition } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, RefreshCw, Loader2, ArrowRight } from 'lucide-react';
 import { getPresignedUploadUrl, registerUploadedFile, deleteUploadedFile } from '@/app/actions/upload';
 import { useRouter } from 'next/navigation';
 
@@ -23,6 +23,8 @@ export default function NewAppealPage() {
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [isRegistering, startTransition] = useTransition();
+  const [createdAppealId, setCreatedAppealId] = useState<string | null>(null);
+  const appealIdRef = useRef<string | null>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -116,23 +118,25 @@ export default function NewAppealPage() {
 
       updateItemStatus(item.id, { progress: 70 });
 
-      const registerRes = await registerUploadedFile(null, item.file.name, item.file.size, item.file.type, storagePath);
+      const currentAppealId = appealIdRef.current;
+      const registerRes = await registerUploadedFile(currentAppealId, item.file.name, item.file.size, item.file.type, storagePath);
 
       if (!registerRes.success || !registerRes.data) {
         throw new Error(registerRes.error?.message || 'Prisma registry registration failed.');
       }
 
-      const { fileId } = registerRes.data;
+      const { fileId, appealId: returnedAppealId } = registerRes.data;
+
+      if (!appealIdRef.current) {
+        appealIdRef.current = returnedAppealId;
+        setCreatedAppealId(returnedAppealId);
+      }
 
       updateItemStatus(item.id, {
         status: 'SUCCESS',
         progress: 100,
         storagePath,
         fileId,
-      });
-
-      startTransition(() => {
-        router.push(`/dashboard`);
       });
     } catch (err: any) {
       updateItemStatus(item.id, {
@@ -286,14 +290,32 @@ export default function NewAppealPage() {
           )}
 
         </CardContent>
-        <CardFooter className="flex justify-between border-t border-white/[0.05] pt-4">
+        <CardFooter className="flex items-center justify-between border-t border-white/[0.05] pt-4">
           <span className="text-[10px] text-zinc-550">Supports multi-file queue selections.</span>
-          {isRegistering && (
-            <div className="flex items-center space-x-2 text-xs text-zinc-400">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#4F8CFF]" />
-              <span>Analyzing appeal drafts...</span>
-            </div>
-          )}
+          
+          <div className="flex items-center space-x-2">
+            {isRegistering && (
+              <div className="flex items-center space-x-2 text-xs text-zinc-400 mr-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[#4F8CFF]" />
+                <span>Redirecting...</span>
+              </div>
+            )}
+            
+            {uploads.length > 0 && uploads.every((item) => item.status === 'SUCCESS' || item.status === 'ERROR') && uploads.some((item) => item.status === 'SUCCESS') && createdAppealId && (
+              <Button
+                onClick={() => {
+                  startTransition(() => {
+                    router.push(`/appeals/${createdAppealId}`);
+                  });
+                }}
+                disabled={isRegistering}
+                className="bg-[#4F8CFF] hover:bg-[#4F8CFF]/90 text-white font-bold h-9 text-xs flex items-center space-x-1.5 animate-pulse shadow-lg shadow-[#4F8CFF]/15"
+              >
+                <span>Proceed to Analysis</span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </CardFooter>
       </Card>
     </div>
