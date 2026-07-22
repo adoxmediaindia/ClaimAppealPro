@@ -33,6 +33,20 @@ export const SUBSCRIPTION_PLANS: Record<string, PricingPlan> = {
       'Priority email and phone support',
     ],
   },
+  enterprise: {
+    planId: 'enterprise',
+    name: 'Enterprise Support',
+    priceId: 'price_enterprise_subscription',
+    limit: 999999,
+    priceAmount: 199,
+    features: [
+      'Unlimited appeal letters generation',
+      'Advanced document OCR cluster',
+      'Collaborative team support',
+      'Custom API endpoints & integrations',
+      '24/7 Dedicated account manager support',
+    ],
+  },
 };
 
 export const getPlanById = (planId: string): PricingPlan => {
