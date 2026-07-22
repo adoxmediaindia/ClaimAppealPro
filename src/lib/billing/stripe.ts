@@ -6,6 +6,17 @@ import { ApiError } from '@/lib/errors';
 export class StripeBillingProvider implements BillingProvider {
   private stripe: Stripe | null = null;
 
+  private isMockMode(): boolean {
+    const key = process.env.STRIPE_SECRET_KEY || '';
+    return (
+      process.env.NODE_ENV === 'test' ||
+      key === 'sk_test_mock-stripe-secret-key' ||
+      key === 'sk_test_your-stripe-key' ||
+      key.includes('your-stripe-key') ||
+      key.includes('mock')
+    );
+  }
+
   private getStripe(): Stripe {
     if (!this.stripe) {
       const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -21,8 +32,16 @@ export class StripeBillingProvider implements BillingProvider {
 
   async createCheckoutSession(params: CheckoutSessionParams): Promise<{ url: string; sessionId: string }> {
     log.info({ userId: params.userId, email: params.email }, 'Creating Stripe checkout session');
-    const stripe = this.getStripe();
 
+    if (this.isMockMode()) {
+      log.info({}, 'Executing mock Stripe checkout session creation');
+      return {
+        url: `${params.successUrl}?session_id=mock_session_${crypto.randomUUID()}`,
+        sessionId: `mock_session_${crypto.randomUUID()}`,
+      };
+    }
+
+    const stripe = this.getStripe();
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -52,8 +71,15 @@ export class StripeBillingProvider implements BillingProvider {
 
   async createPortalSession(stripeCustomerId: string, returnUrl: string): Promise<{ url: string }> {
     log.info({ stripeCustomerId }, 'Creating Stripe customer portal session');
-    const stripe = this.getStripe();
 
+    if (this.isMockMode()) {
+      log.info({}, 'Executing mock Stripe customer portal session creation');
+      return {
+        url: returnUrl,
+      };
+    }
+
+    const stripe = this.getStripe();
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: returnUrl,
@@ -66,8 +92,18 @@ export class StripeBillingProvider implements BillingProvider {
 
   async constructWebhookEvent(rawBody: string, signature: string, secret: string): Promise<BillingEvent> {
     log.info({}, 'Verifying Stripe webhook event signature');
-    const stripe = this.getStripe();
 
+    if (this.isMockMode()) {
+      log.info({}, 'Executing mock Stripe webhook event verification');
+      try {
+        const parsed = JSON.parse(rawBody);
+        return this.mapStripeEventToBillingEvent(parsed);
+      } catch (err: any) {
+        throw new Error(`Failed to parse mock webhook body: ${err.message}`);
+      }
+    }
+
+    const stripe = this.getStripe();
     if (!secret) {
       throw new ApiError(400, 'STRIPE_WEBHOOK_SECRET_MISSING', 'Stripe webhook secret is not configured.');
     }
