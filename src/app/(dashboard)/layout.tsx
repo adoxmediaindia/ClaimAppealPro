@@ -32,6 +32,12 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     },
   });
 
+  const notifications = await prisma.notification.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  });
+
   const userRole = dbUser?.role || 'USER';
   const usageCount = dbUser?._count?.appeals || 0;
   
@@ -45,6 +51,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       userRole={userRole}
       usageCount={usageCount}
       usageLimit={usageLimit}
+      initialNotifications={notifications}
     >
       {children}
     </AppShellClient>

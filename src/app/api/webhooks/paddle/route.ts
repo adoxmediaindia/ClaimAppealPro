@@ -3,6 +3,7 @@ import getBillingProvider from '@/lib/billing';
 import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import { getPlanByPriceId } from '@/lib/billing/plans';
+import { sendSubscriptionSuccessEmail, sendPaymentReceiptEmail } from '@/lib/email/templates';
 
 export async function POST(req: NextRequest) {
   const correlationId = crypto.randomUUID();
@@ -65,6 +66,21 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Fetch user email for alerts
+        const userRecord = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        });
+
+        if (userRecord?.email) {
+          sendSubscriptionSuccessEmail(userRecord.email, userId, 'pro').catch((err) => {
+            log.error({ error: err.message }, 'Failed to dispatch subscription success email');
+          });
+          sendPaymentReceiptEmail(userRecord.email, userId, event.amount || 4900).catch((err) => {
+            log.error({ error: err.message }, 'Failed to dispatch payment receipt email');
+          });
+        }
+
         // Log System Audit Event
         await prisma.auditLog.create({
           data: {
@@ -79,6 +95,11 @@ export async function POST(req: NextRequest) {
       case 'invoice.paid': {
         const subscription = await prisma.subscription.findUnique({
           where: { paddleCustomerId: event.customerId },
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
         });
 
         if (subscription) {
@@ -91,6 +112,12 @@ export async function POST(req: NextRequest) {
               status: 'completed',
             },
           });
+
+          if (subscription.user?.email) {
+            sendPaymentReceiptEmail(subscription.user.email, subscription.userId, event.amount || 4900).catch((err) => {
+              log.error({ error: err.message }, 'Failed to dispatch payment receipt email');
+            });
+          }
 
           // Log Audit Event
           await prisma.auditLog.create({

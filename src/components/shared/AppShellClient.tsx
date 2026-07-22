@@ -11,6 +11,7 @@ interface AppShellClientProps {
   userRole: string;
   usageCount: number;
   usageLimit: number;
+  initialNotifications?: any[];
 }
 
 export default function AppShellClient({
@@ -19,6 +20,7 @@ export default function AppShellClient({
   userRole,
   usageCount,
   usageLimit,
+  initialNotifications = [],
 }: AppShellClientProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -55,6 +57,7 @@ export default function AppShellClient({
           userEmail={userEmail}
           usageCount={usageCount}
           usageLimit={usageLimit}
+          initialNotifications={initialNotifications}
         />
 
         {/* Viewport Dashboard Workspace */}
