@@ -207,8 +207,8 @@ export async function updateUserSubscriptionAction(targetUserId: string, planId:
       where: { userId: targetUserId },
       create: {
         userId: targetUserId,
-        stripeCustomerId: `cus_admin_${targetUserId}`,
-        stripeSubscriptionId: `sub_admin_${targetUserId}`,
+        paddleCustomerId: `cus_admin_${targetUserId}`,
+        paddleSubscriptionId: `sub_admin_${targetUserId}`,
         planId,
         status: 'active',
         currentPeriodStart: new Date(),
