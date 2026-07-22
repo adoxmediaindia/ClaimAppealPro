@@ -20,6 +20,7 @@ import {
 
 import { generateAppealAction, rollbackAppealVersionAction } from '@/app/actions/ai';
 import { generatePdfExportAction, getPdfExportsAction, getPdfSignedUrlAction } from '@/app/actions/pdf';
+import RichTextEditor from './RichTextEditor';
 
 interface AppealVersionData {
   id: string;
@@ -179,9 +180,46 @@ export default function AiAppealView({
               </div>
             )}
 
-            {/* Letter Body Textbox */}
-            <div className="w-full bg-[#08090B] border border-white/[0.08] rounded-md p-6 font-mono text-xs text-zinc-350 leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto min-h-[300px] select-text">
-              {activeVersion?.letterContent || 'No letter content has been generated.'}
+            {/* Rich Text Editor */}
+            <div className="mb-4">
+              <RichTextEditor
+                appealId={appealId}
+                versionNumber={activeVersion?.versionNumber || 1}
+                initialContent={activeVersion?.letterContent || ''}
+                onExportPdf={async (customContent) => {
+                  setError(null);
+                  setPdfLoading(true);
+                  try {
+                    const res = await generatePdfExportAction(
+                      appealId,
+                      activeVersionNumber,
+                      selectedTemplate,
+                      selectedSize,
+                      customContent
+                    );
+                    if (res.success && res.data) {
+                      const listRes = await getPdfExportsAction(appealId);
+                      if (listRes.success && listRes.data) {
+                        setPdfExports(listRes.data);
+                      }
+                      const urlRes = await getPdfSignedUrlAction(appealId, res.data.id);
+                      if (urlRes.success && urlRes.data) {
+                        setPreviewUrl(urlRes.data);
+                      }
+                    } else {
+                      setError(res.error?.message || 'Failed to generate PDF export.');
+                    }
+                  } catch (err: any) {
+                    setError(err.message || 'An error occurred during PDF generation.');
+                  } finally {
+                    setPdfLoading(false);
+                  }
+                }}
+                pdfLoading={pdfLoading}
+                onSave={() => {
+                  // Reload version display on save complete
+                }}
+              />
             </div>
 
             {/* PDF Print Preview Frame */}

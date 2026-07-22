@@ -295,3 +295,65 @@ export async function rollbackAppealVersionAction(
     };
   }
 }
+
+export async function saveAppealVersionAction(
+  appealId: string,
+  versionNumber: number,
+  letterContent: string
+): Promise<ActionResponse<{ success: boolean }>> {
+  const correlationId = crypto.randomUUID();
+  log.info({ correlationId, appealId, versionNumber }, 'Saving appeal version content');
+
+  try {
+    const supabase = await createServerSideClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new UnauthorizedError('Unauthorized: Authentication required.');
+    }
+
+    const appeal = await prisma.appeal.findUnique({
+      where: { id: appealId },
+    });
+
+    if (!appeal || appeal.deletedAt) {
+      throw new ValidationError('Appeal draft not found.');
+    }
+    if (appeal.userId !== user.id) {
+      throw new UnauthorizedError('Unauthorized: You do not own this appeal.');
+    }
+
+    await prisma.appealVersion.update({
+      where: {
+        appeal_version_unique_idx: {
+          appealId,
+          versionNumber,
+        },
+      },
+      data: {
+        letterContent,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'APPEAL_VERSION_SAVED',
+        details: { appealId, versionNumber, letterLength: letterContent.length },
+      },
+    });
+
+    return {
+      success: true,
+      data: { success: true },
+    };
+  } catch (error: any) {
+    log.error({ correlationId, error: error.message }, 'Failed to save appeal version');
+    return {
+      success: false,
+      error: {
+        code: error.errorCode || 'INTERNAL_SERVER_ERROR',
+        message: error.message || 'Failed to save appeal content.',
+      },
+    };
+  }
+}

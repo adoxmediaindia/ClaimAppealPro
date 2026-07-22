@@ -69,12 +69,13 @@ export async function generatePdfExportAction(
   appealId: string,
   versionNumber: number,
   templateName: string,
-  size: 'letter' | 'a4' = 'letter'
+  size: 'letter' | 'a4' = 'letter',
+  customLetterContent?: string
 ): Promise<ActionResponse<any>> {
   const correlationId = crypto.randomUUID ? crypto.randomUUID() : 'pdf-gen-uuid';
   
   log.info(
-    { correlationId, appealId, versionNumber, templateName, size },
+    { correlationId, appealId, versionNumber, templateName, size, hasCustomContent: !!customLetterContent },
     'generatePdfExportAction action invoked'
   );
 
@@ -122,7 +123,7 @@ export async function generatePdfExportAction(
       appealDeadline: extractValue(input.appealDeadline) || 'N/A',
       contactInformation: extractValue(input.contactInformation) || 'N/A',
       address: extractValue(input.address) || 'N/A',
-      letterContent: targetVersion.letterContent,
+      letterContent: customLetterContent || targetVersion.letterContent,
     };
 
     // 5. Compile into HTML content
