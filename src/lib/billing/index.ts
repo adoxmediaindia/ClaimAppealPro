@@ -1,15 +1,16 @@
 import { BillingProvider } from './provider';
-import { StripeBillingProvider } from './stripe';
+import { PaddleBillingProvider } from './paddle';
 import { NullBillingProvider } from './nullBilling';
 
 export * from './provider';
 export * from './plans';
 
 export const getBillingProvider = (): BillingProvider => {
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const paddleKey = process.env.PADDLE_API_KEY;
+  const isTest = process.env.NODE_ENV === 'test';
 
-  if (stripeKey && stripeKey.trim() !== '' && !stripeKey.includes('your-stripe-key')) {
-    return new StripeBillingProvider();
+  if (isTest || (paddleKey && paddleKey.trim() !== '' && !paddleKey.includes('your-paddle-key'))) {
+    return new PaddleBillingProvider();
   }
 
   return new NullBillingProvider();

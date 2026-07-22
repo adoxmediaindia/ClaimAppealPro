@@ -107,7 +107,7 @@ export async function createCustomerPortalAction(): Promise<ActionResponse<{ url
       where: { userId: user.id },
     });
 
-    if (!subscription || !subscription.stripeCustomerId) {
+    if (!subscription || !subscription.paddleCustomerId) {
       return {
         success: false,
         error: {
@@ -120,14 +120,14 @@ export async function createCustomerPortalAction(): Promise<ActionResponse<{ url
     const provider = getBillingProvider();
     const returnUrl = `${config.APP_URL}/billing`;
 
-    const session = await provider.createPortalSession(subscription.stripeCustomerId, returnUrl);
+    const session = await provider.createPortalSession(subscription.paddleCustomerId, returnUrl);
 
     // Write audit log
     await prisma.auditLog.create({
       data: {
         userId: user.id,
         action: 'BILLING_PORTAL_OPENED',
-        details: { stripeCustomerId: subscription.stripeCustomerId },
+        details: { paddleCustomerId: subscription.paddleCustomerId },
       },
     });
 

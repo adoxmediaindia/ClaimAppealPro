@@ -1,50 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getBillingProvider from '@/lib/billing';
 import prisma from '@/lib/prisma';
-import config from '@/config';
 import log from '@/lib/logger';
 import { getPlanByPriceId } from '@/lib/billing/plans';
 
 export async function POST(req: NextRequest) {
   const correlationId = crypto.randomUUID();
-  log.info({ correlationId }, 'Stripe webhook POST trigger received');
+  log.info({ correlationId }, 'Paddle webhook POST trigger received');
 
-  const signature = req.headers.get('stripe-signature') || '';
+  const signature = req.headers.get('paddle-signature') || '';
   if (!signature) {
-    log.warn({ correlationId }, 'Missing stripe-signature header. Rejecting webhook request.');
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    log.warn({ correlationId }, 'Missing paddle-signature header. Rejecting webhook request.');
+    return NextResponse.json({ error: 'Missing paddle-signature header' }, { status: 400 });
   }
 
   try {
     const rawBody = await req.text();
     const provider = getBillingProvider();
-    const event = await provider.constructWebhookEvent(rawBody, signature, config.STRIPE_WEBHOOK_SECRET);
-
-    log.info({ correlationId, eventType: event.type }, 'Stripe webhook verified and mapped');
+    
+    // Paddle webhook secret is read from env
+    const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET || 'mock-paddle-webhook-secret';
+    
+    const event = await provider.constructWebhookEvent(rawBody, signature, webhookSecret);
+    log.info({ correlationId, eventType: event.type }, 'Paddle webhook verified and mapped successfully');
 
     switch (event.type) {
       case 'checkout.completed': {
         const userId = event.metadata?.userId;
         if (!userId) {
-          log.error({ correlationId }, 'Stripe checkout event missing userId metadata');
+          log.error({ correlationId }, 'Paddle checkout event missing userId metadata');
           return NextResponse.json({ error: 'Missing userId metadata' }, { status: 400 });
         }
 
-        // Upsert User Subscription details
+        // Upsert User Subscription details using Paddle fields
         await prisma.subscription.upsert({
           where: { userId },
           create: {
             userId,
-            stripeCustomerId: event.customerId,
-            stripeSubscriptionId: event.subscriptionId || '',
-            planId: 'pro', // Starter upgrade is to Pro plan
+            paddleCustomerId: event.customerId,
+            paddleSubscriptionId: event.subscriptionId || '',
+            planId: 'pro',
             status: 'active',
             currentPeriodStart: new Date(),
             currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
           },
           update: {
-            stripeCustomerId: event.customerId,
-            stripeSubscriptionId: event.subscriptionId,
+            paddleCustomerId: event.customerId,
+            paddleSubscriptionId: event.subscriptionId,
             planId: 'pro',
             status: 'active',
             currentPeriodStart: new Date(),
@@ -52,11 +54,11 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Record initial payment record
+        // Record initial payment record using Paddle fields
         await prisma.payment.create({
           data: {
             userId,
-            stripeSessionId: `checkout_${event.subscriptionId || crypto.randomUUID()}`,
+            paddleSessionId: `checkout_${event.subscriptionId || crypto.randomUUID()}`,
             amount: event.amount || 4900, // $49.00 default in cents
             currency: event.currency || 'usd',
             status: 'completed',
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
         await prisma.auditLog.create({
           data: {
             userId,
-            action: 'STRIPE_CHECKOUT_COMPLETED',
+            action: 'PADDLE_CHECKOUT_COMPLETED',
             details: { customerId: event.customerId, subscriptionId: event.subscriptionId },
           },
         });
@@ -76,14 +78,14 @@ export async function POST(req: NextRequest) {
 
       case 'invoice.paid': {
         const subscription = await prisma.subscription.findUnique({
-          where: { stripeCustomerId: event.customerId },
+          where: { paddleCustomerId: event.customerId },
         });
 
         if (subscription) {
           await prisma.payment.create({
             data: {
               userId: subscription.userId,
-              stripeSessionId: `invoice_${event.subscriptionId || crypto.randomUUID()}_${Date.now()}`,
+              paddleSessionId: `invoice_${event.subscriptionId || crypto.randomUUID()}_${Date.now()}`,
               amount: event.amount || 4900,
               currency: event.currency || 'usd',
               status: 'completed',
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest) {
           await prisma.auditLog.create({
             data: {
               userId: subscription.userId,
-              action: 'STRIPE_INVOICE_PAID',
+              action: 'PADDLE_INVOICE_PAID',
               details: { subscriptionId: event.subscriptionId, amount: event.amount },
             },
           });
@@ -104,15 +106,15 @@ export async function POST(req: NextRequest) {
 
       case 'subscription.updated': {
         const subscription = await prisma.subscription.findUnique({
-          where: { stripeCustomerId: event.customerId },
+          where: { paddleCustomerId: event.customerId },
         });
 
         if (subscription) {
           const plan = getPlanByPriceId(event.priceId || '');
           await prisma.subscription.update({
-            where: { stripeCustomerId: event.customerId },
+            where: { paddleCustomerId: event.customerId },
             data: {
-              stripeSubscriptionId: event.subscriptionId || subscription.stripeSubscriptionId,
+              paddleSubscriptionId: event.subscriptionId || subscription.paddleSubscriptionId,
               planId: plan.planId,
               status: event.status || 'active',
               currentPeriodStart: event.currentPeriodStart || new Date(),
@@ -125,7 +127,7 @@ export async function POST(req: NextRequest) {
           await prisma.auditLog.create({
             data: {
               userId: subscription.userId,
-              action: 'STRIPE_SUBSCRIPTION_UPDATED',
+              action: 'PADDLE_SUBSCRIPTION_UPDATED',
               details: {
                 subscriptionId: event.subscriptionId,
                 status: event.status,
@@ -139,13 +141,13 @@ export async function POST(req: NextRequest) {
 
       case 'subscription.deleted': {
         const subscription = await prisma.subscription.findUnique({
-          where: { stripeCustomerId: event.customerId },
+          where: { paddleCustomerId: event.customerId },
         });
 
         if (subscription) {
           // Downgrade subscription to free tier limits
           await prisma.subscription.update({
-            where: { stripeCustomerId: event.customerId },
+            where: { paddleCustomerId: event.customerId },
             data: {
               status: 'canceled',
               planId: 'free',
@@ -156,7 +158,7 @@ export async function POST(req: NextRequest) {
           await prisma.auditLog.create({
             data: {
               userId: subscription.userId,
-              action: 'STRIPE_SUBSCRIPTION_DELETED',
+              action: 'PADDLE_SUBSCRIPTION_DELETED',
               details: { subscriptionId: event.subscriptionId },
             },
           });
@@ -165,12 +167,12 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        log.info({ eventType: event.type }, 'Ignoring unhandled stripe event type');
+        log.info({ eventType: event.type }, 'Ignoring unhandled paddle event type');
     }
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    log.error({ correlationId, error: error.message }, 'Failed to process Stripe Webhook POST event');
+    log.error({ correlationId, error: error.message }, 'Failed to process Paddle Webhook POST event');
     return NextResponse.json({ error: `Webhook handling error: ${error.message}` }, { status: 400 });
   }
 }

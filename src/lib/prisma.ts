@@ -75,8 +75,8 @@ function getMockState() {
     subscription: {
       id: 'mock-sub-id',
       userId: 'mock-uuid',
-      stripeCustomerId: 'cus_mock-customer-id',
-      stripeSubscriptionId: 'sub_mock-subscription-id',
+      paddleCustomerId: 'cus_mock-customer-id',
+      paddleSubscriptionId: 'sub_mock-subscription-id',
       planId: 'free',
       status: 'active',
       currentPeriodStart: new Date().toISOString(),
@@ -176,16 +176,16 @@ const createMockModel = (modelName: string) => {
       if (modelName === 'subscription') {
         const state = getMockState();
         const userId = args?.where?.userId;
-        const stripeCustomerId = args?.where?.stripeCustomerId;
-        const stripeSubscriptionId = args?.where?.stripeSubscriptionId;
+        const paddleCustomerId = args?.where?.paddleCustomerId;
+        const paddleSubscriptionId = args?.where?.paddleSubscriptionId;
 
         if (userId && state.subscription?.userId === userId) {
           return state.subscription;
         }
-        if (stripeCustomerId && state.subscription?.stripeCustomerId === stripeCustomerId) {
+        if (paddleCustomerId && state.subscription?.paddleCustomerId === paddleCustomerId) {
           return state.subscription;
         }
-        if (stripeSubscriptionId && state.subscription?.stripeSubscriptionId === stripeSubscriptionId) {
+        if (paddleSubscriptionId && state.subscription?.paddleSubscriptionId === paddleSubscriptionId) {
           return state.subscription;
         }
         return state.subscription || null;

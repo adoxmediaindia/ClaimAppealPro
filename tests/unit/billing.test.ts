@@ -3,7 +3,7 @@ import { getPlanById, getPlanByPriceId } from '@/lib/billing/plans';
 import { createCheckoutSessionAction, createCustomerPortalAction, fetchInvoiceHistoryAction } from '@/app/actions/billing';
 import { processOcrForFile } from '@/app/actions/ocr';
 import { generateAppealAction } from '@/app/actions/ai';
-import { POST } from '@/app/api/webhooks/stripe/route';
+import { POST } from '@/app/api/webhooks/paddle/route';
 import { NextRequest } from 'next/server';
 
 // 1. Setup hoisted mocks
@@ -149,8 +149,8 @@ describe('Billing & Subscription System Unit Tests', () => {
       });
 
       hoisted.mockSubFindUnique.mockResolvedValue({
-        stripeCustomerId: 'cus_test-customer',
-        stripeSubscriptionId: 'sub_test',
+        paddleCustomerId: 'cus_test-customer',
+        paddleSubscriptionId: 'sub_test',
         status: 'active',
       });
 
@@ -197,26 +197,26 @@ describe('Billing & Subscription System Unit Tests', () => {
     });
   });
 
-  describe('Stripe Webhook Event Handlers', () => {
+  describe('Paddle Webhook Event Handlers', () => {
     it('should process checkout completed events updating subscription status', async () => {
       const payload = {
-        type: 'checkout.session.completed',
+        event_type: 'subscription.created',
         data: {
-          object: {
-            customer: 'cus_test-customer',
-            subscription: 'sub_test-subscription',
-            amount_total: 4900,
-            currency: 'usd',
-            metadata: {
-              userId: 'user-uuid',
-            },
+          customer_id: 'cus_test-customer',
+          id: 'sub_test-subscription',
+          custom_data: {
+            userId: 'user-uuid',
           },
+          next_billing_period: {
+            amount: 4900,
+          },
+          currency_code: 'USD',
         },
       };
 
-      const req = new NextRequest('http://localhost:3000/api/webhooks/stripe', {
+      const req = new NextRequest('http://localhost:3000/api/webhooks/paddle', {
         method: 'POST',
-        headers: { 'stripe-signature': 'mock-sig' },
+        headers: { 'paddle-signature': 't=1672531199;h=mock-sig' },
         body: JSON.stringify(payload),
       });
 
@@ -231,7 +231,7 @@ describe('Billing & Subscription System Unit Tests', () => {
       expect(hoisted.mockAuditLogCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            action: 'STRIPE_CHECKOUT_COMPLETED',
+            action: 'PADDLE_CHECKOUT_COMPLETED',
           }),
         })
       );
@@ -239,20 +239,22 @@ describe('Billing & Subscription System Unit Tests', () => {
 
     it('should process invoice paid events writing payment logs', async () => {
       const payload = {
-        type: 'invoice.paid',
+        event_type: 'transaction.completed',
         data: {
-          object: {
-            customer: 'cus_test-customer',
-            subscription: 'sub_test-subscription',
-            amount_paid: 4900,
-            currency: 'usd',
+          customer_id: 'cus_test-customer',
+          subscription_id: 'sub_test-subscription',
+          details: {
+            totals: {
+              grand_total: 4900,
+            },
           },
+          currency_code: 'USD',
         },
       };
 
-      const req = new NextRequest('http://localhost:3000/api/webhooks/stripe', {
+      const req = new NextRequest('http://localhost:3000/api/webhooks/paddle', {
         method: 'POST',
-        headers: { 'stripe-signature': 'mock-sig' },
+        headers: { 'paddle-signature': 't=1672531199;h=mock-sig' },
         body: JSON.stringify(payload),
       });
 
@@ -265,19 +267,17 @@ describe('Billing & Subscription System Unit Tests', () => {
 
     it('should process subscription deleted event downgrading subscription to free', async () => {
       const payload = {
-        type: 'customer.subscription.deleted',
+        event_type: 'subscription.canceled',
         data: {
-          object: {
-            customer: 'cus_test-customer',
-            id: 'sub_test-subscription',
-            status: 'canceled',
-          },
+          customer_id: 'cus_test-customer',
+          id: 'sub_test-subscription',
+          status: 'canceled',
         },
       };
 
-      const req = new NextRequest('http://localhost:3000/api/webhooks/stripe', {
+      const req = new NextRequest('http://localhost:3000/api/webhooks/paddle', {
         method: 'POST',
-        headers: { 'stripe-signature': 'mock-sig' },
+        headers: { 'paddle-signature': 't=1672531199;h=mock-sig' },
         body: JSON.stringify(payload),
       });
 
