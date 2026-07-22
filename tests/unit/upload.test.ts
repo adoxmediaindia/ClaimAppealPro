@@ -43,20 +43,26 @@ const { mockCreateSignedUploadUrl, mockCreateSignedUrl, mockRemove, mockGetUser 
   mockGetUser: vi.fn(),
 }));
 
-vi.mock('@/lib/supabase', () => ({
-  createServerSideClient: () => ({
+vi.mock('@/lib/supabase', () => {
+  const mockClient = {
     auth: {
       getUser: mockGetUser,
     },
     storage: {
+      getBucket: vi.fn().mockResolvedValue({ data: { id: 'denials' }, error: null }),
+      createBucket: vi.fn().mockResolvedValue({ data: { name: 'denials' }, error: null }),
       from: () => ({
         createSignedUploadUrl: mockCreateSignedUploadUrl,
         createSignedUrl: mockCreateSignedUrl,
         remove: mockRemove,
       }),
     },
-  }),
-}));
+  };
+  return {
+    createServerSideClient: () => mockClient,
+    createAdminClient: () => mockClient,
+  };
+});
 
 vi.mock('@/lib/prisma', () => ({
   default: mockPrisma,

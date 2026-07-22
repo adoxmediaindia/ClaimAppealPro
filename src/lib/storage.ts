@@ -1,4 +1,4 @@
-import { createServerSideClient } from '@/lib/supabase';
+import { createServerSideClient, createAdminClient } from '@/lib/supabase';
 import { ApiError } from '@/lib/errors';
 import log from '@/lib/logger';
 
@@ -74,7 +74,27 @@ export class SupabaseStorageProvider implements StorageProvider {
       'Generating presigned upload URL from Supabase Storage'
     );
 
-    const supabase = await createServerSideClient();
+    const supabase = createAdminClient();
+
+    // Proactively verify if the bucket exists. If not, create it!
+    try {
+      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket(this.bucketName);
+      if (bucketError || !bucketData) {
+        log.warn({ correlationId, bucketName: this.bucketName, bucketError: bucketError?.message }, 'Storage bucket not found. Proactively creating the bucket...');
+        const { error: createError } = await supabase.storage.createBucket(this.bucketName, {
+          public: false, // Private bucket
+          allowedMimeTypes: ALLOWED_MIMES,
+          fileSizeLimit: MAX_SIZE,
+        });
+        if (createError) {
+          log.error({ correlationId, bucketName: this.bucketName }, 'Failed to create storage bucket', createError);
+        } else {
+          log.info({ correlationId, bucketName: this.bucketName }, 'Storage bucket created successfully');
+        }
+      }
+    } catch (bucketCatchErr: any) {
+      log.error({ correlationId, bucketName: this.bucketName, error: bucketCatchErr.message }, 'Error checking/creating storage bucket');
+    }
     
     // Supabase createSignedUploadUrl automatically expires after default seconds (typically 300s)
     const { data, error } = await supabase.storage
@@ -82,8 +102,8 @@ export class SupabaseStorageProvider implements StorageProvider {
       .createSignedUploadUrl(storagePath);
 
     if (error) {
-      log.error({ correlationId, errorCode: error.name }, 'Supabase Storage presigned URL generation failed', error);
-      throw new ApiError(500, 'STORAGE_UPLOAD_ERROR', 'Failed to generate presigned upload URL.');
+      log.error({ correlationId, errorMsg: error.message, errorDetails: error }, 'Supabase Storage presigned URL generation failed');
+      throw new ApiError(500, 'STORAGE_UPLOAD_ERROR', `Failed to generate presigned upload URL: ${error.message}`);
     }
 
     return {

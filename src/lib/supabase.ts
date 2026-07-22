@@ -1,4 +1,5 @@
 import { createBrowserClient, createServerClient } from '@supabase/ssr';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import config from '@/config';
 
@@ -62,6 +63,60 @@ export const createServerSideClient = async () => {
       };
     };
 
+    client.storage.from = (_bucket: string) => {
+      return {
+        download: async (_path: string) => {
+          return {
+            data: new Blob([Buffer.from('mock file content')]),
+            error: null,
+          } as any;
+        },
+        createSignedUrl: async (_path: string, _expiry: number) => {
+          return {
+            data: { signedUrl: 'https://mock.supabase.co/signed-url' },
+            error: null,
+          } as any;
+        },
+        createSignedUploadUrl: async (_path: string) => {
+          return {
+            data: { signedUrl: 'http://localhost:3000/api/mock-upload' },
+            error: null,
+          } as any;
+        },
+        upload: async (_path: string, _body: any, _options?: any) => {
+          return { data: { path: _path }, error: null } as any;
+        },
+        remove: async (_paths: string[]) => {
+          return { data: [], error: null } as any;
+        },
+      } as any;
+    };
+  }
+
+  return client;
+};
+
+// 3. Admin Client Helper (Service Role Key for storage/backend admin tasks)
+export const createAdminClient = () => {
+  const client = createSupabaseClient(
+    config.NEXT_PUBLIC_SUPABASE_URL || 'https://mock.supabase.co',
+    config.SUPABASE_SERVICE_ROLE_KEY || 'mock-service-role-key',
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    }
+  );
+
+  const isTest = process.env.NODE_ENV === 'test';
+  if (isTest) {
+    client.storage.getBucket = async (_id: string) => {
+      return { data: { id: 'denials' }, error: null } as any;
+    };
+    client.storage.createBucket = async (_id: string, _options?: any) => {
+      return { data: { name: 'denials' }, error: null } as any;
+    };
     client.storage.from = (_bucket: string) => {
       return {
         download: async (_path: string) => {
