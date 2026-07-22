@@ -15,22 +15,46 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const userData = await prisma.user.findUnique({
-    where: { id: user.id },
-    include: {
-      profile: true,
-      subscription: true,
-      appeals: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      },
-      _count: {
-        select: {
-          appeals: true,
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const [userData, appealsThisMonth, exportedCount, usageSum] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        profile: true,
+        subscription: true,
+        appeals: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        _count: {
+          select: {
+            appeals: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.appeal.count({
+      where: {
+        userId: user.id,
+        createdAt: { gte: startOfMonth },
+      },
+    }),
+    prisma.appeal.count({
+      where: {
+        userId: user.id,
+        status: 'EXPORTED',
+      },
+    }),
+    prisma.usageLog.aggregate({
+      where: { userId: user.id },
+      _sum: {
+        tokenCount: true,
+      },
+    }),
+  ]);
 
   const firstName = userData?.profile?.firstName || 'Valued';
   const lastName = userData?.profile?.lastName || 'Provider';
@@ -38,6 +62,11 @@ export default async function DashboardPage() {
   const planTier = userData?.subscription?.planId ? userData.subscription.planId.toUpperCase() : 'FREE TRIAL';
   const subscriptionStatus = userData?.subscription?.status || 'Active';
   const activeAppealsList = userData?.appeals || [];
+
+  const limit = planTier === 'PRO' ? 100 : 5;
+  const remainingCredits = Math.max(limit - appealsThisMonth, 0);
+  const totalTokensUsed = usageSum._sum.tokenCount || 0;
+  const successRate = totalAppeals > 0 ? Math.round((exportedCount / totalAppeals) * 100) : 100;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -63,10 +92,10 @@ export default async function DashboardPage() {
       </div>
 
       {/* 2. Key Metrics Overview Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         
         {/* Appeals Count Card */}
-        <Card className="border-zinc-800 hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+        <Card className="border border-white/[0.08] hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden">
           <div className="absolute top-0 right-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-[#4F8CFF]/5 blur-xl group-hover:scale-150 transition-transform" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider">
@@ -78,13 +107,45 @@ export default async function DashboardPage() {
             <div className="text-3xl font-extrabold text-white">{totalAppeals}</div>
             <p className="text-[10px] text-zinc-550 mt-1 flex items-center">
               <TrendingUp className="h-3 w-3 text-[#10B981] mr-1" />
-              <span>All-time insurance appeal drafts</span>
+              <span>{appealsThisMonth} generated this month</span>
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Remaining Credits Card */}
+        <Card className="border border-white/[0.08] hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider">
+              Remaining Credits
+            </CardTitle>
+            <Sparkles className="h-4 w-4 text-[#6EE7F9]" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-white">{remainingCredits}</div>
+            <p className="text-[10px] text-zinc-550 mt-1">
+              Active plan allocation: {limit} limit
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Success Rate Card */}
+        <Card className="border border-white/[0.08] hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">
+              Export Success Rate
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-[#10B981]" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-white">{successRate}%</div>
+            <p className="text-[10px] text-zinc-550 mt-1">
+              {exportedCount} out of {totalAppeals} drafts exported
             </p>
           </CardContent>
         </Card>
 
         {/* Subscription Status Card */}
-        <Card className="border-zinc-800 hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+        <Card className="border border-white/[0.08] hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">
               Subscription Plan
@@ -99,23 +160,7 @@ export default async function DashboardPage() {
               </span>
             </div>
             <p className="text-[10px] text-zinc-550 mt-1">
-              Provides up to 5 generations per month
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* AI Processing Status Card */}
-        <Card className="border-zinc-800 hover:border-white/[0.15] bg-[#14171C] transition-all group relative overflow-hidden md:col-span-2 lg:col-span-1" style={{ borderColor: 'rgba(255, 255, 255, 0.08)' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">
-              AI Token Operations
-            </CardTitle>
-            <Sparkles className="h-4 w-4 text-[#6EE7F9]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold text-white">AI Active</div>
-            <p className="text-[10px] text-zinc-550 mt-1">
-              GPT-4o document analysis is enabled
+              AI Token Operations: {totalTokensUsed.toLocaleString()}
             </p>
           </CardContent>
         </Card>

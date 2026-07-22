@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, CreditCard, Settings, LogOut, X, ShieldAlert, Activity } from 'lucide-react';
+import { LayoutDashboard, FileText, CreditCard, Settings, LogOut, X, ShieldAlert, Activity, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logoutUser } from '@/app/actions/auth';
 import { useRouter } from 'next/navigation';
@@ -30,6 +30,7 @@ export default function Sidebar({ isOpen, onClose, userRole = 'USER' }: SidebarP
     { name: 'Appeals', href: '/appeals', icon: FileText },
     { name: 'Billing', href: '/billing', icon: CreditCard },
     { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Activity Logs', href: '/activity', icon: History },
   ];
 
   if (userRole === 'ADMIN') {
