@@ -7,7 +7,7 @@ export async function GET() {
   const stats: Record<string, string> = {
     database: 'ONLINE',
     storage: 'ONLINE',
-    openai: 'ONLINE',
+    gemini: 'ONLINE',
   };
 
   try {

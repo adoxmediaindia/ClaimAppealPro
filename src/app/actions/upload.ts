@@ -45,7 +45,7 @@ export async function getPresignedUploadUrl(
         storagePath,
       },
     };
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof ApiError) {
       return {
         success: false,
@@ -56,12 +56,25 @@ export async function getPresignedUploadUrl(
       };
     }
 
-    log.error({ correlationId }, 'Unexpected error generating presigned upload URL', error);
+    const errorDetails = {
+      message: error?.message || 'No error message',
+      name: error?.name || 'Error',
+      stack: error?.stack || 'No stack trace available',
+      code: error?.code,
+      details: error?.details || null,
+      status: error?.status || null,
+    };
+
+    log.error(
+      { correlationId, ...errorDetails },
+      'Unexpected error generating presigned upload URL detailed debug dump'
+    );
+
     return {
       success: false,
       error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected internal error occurred.',
+        code: 'DEBUG_INTERNAL_ERROR',
+        message: `Debug dump: [${errorDetails.name}] ${errorDetails.message}. Stack: ${errorDetails.stack.split('\n').slice(0, 3).join(' | ')}`,
       },
     };
   }

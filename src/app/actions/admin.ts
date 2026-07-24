@@ -265,7 +265,7 @@ export async function fetchFeatureFlagsAction(): Promise<ActionResponse<any[]>> 
         success: true,
         data: [
           { id: 'flag-1', key: 'OCR_FALLBACK_ENABLED', value: true, description: 'Bypasses Mistral failures to Tesseract local client.' },
-          { id: 'flag-2', key: 'AI_TEMPLATE_RETRY_ENABLED', value: true, description: 'Retries OpenAI completion requests upon timeout errors.' },
+          { id: 'flag-2', key: 'AI_TEMPLATE_RETRY_ENABLED', value: true, description: 'Retries Gemini completion requests upon timeout errors.' },
         ],
       };
     }
@@ -391,7 +391,7 @@ export async function fetchSystemHealthAction(): Promise<ActionResponse<any>> {
       data: {
         database: 'ONLINE',
         storage: 'ONLINE',
-        openai: 'HEALTHY (180ms)',
+        gemini: 'HEALTHY (180ms)',
         compiler: 'ONLINE',
         uptimeSeconds: Math.floor(process.uptime()),
         timestamp: new Date().toISOString(),

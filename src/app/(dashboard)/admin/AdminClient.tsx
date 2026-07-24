@@ -269,7 +269,7 @@ export default function AdminClient({
                 <Badge variant="success">ONLINE</Badge>
               </div>
               <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
-                <span>Mistral & OpenAI API Gateway</span>
+                <span>Mistral & Gemini API Gateway</span>
                 <Badge variant="success">HEALTHY</Badge>
               </div>
               <div className="flex justify-between items-center">
@@ -477,10 +477,10 @@ export default function AdminClient({
               </div>
               <div className="flex justify-between items-center border-b border-white/[0.05] pb-2.5">
                 <span className="flex items-center">
-                  <Activity className="h-4 w-4 mr-2 text-zinc-455" /> OpenAI Latency
+                  <Activity className="h-4 w-4 mr-2 text-zinc-455" /> Gemini Latency
                 </span>
                 <span className="flex items-center text-[#10B981] font-semibold">
-                  <CheckCircle className="h-4 w-4 mr-1 text-[#10B981]" /> {initialHealth.openai}
+                  <CheckCircle className="h-4 w-4 mr-1 text-[#10B981]" /> {initialHealth.gemini}
                 </span>
               </div>
               <div className="flex justify-between items-center border-b border-white/[0.05] pb-2.5">

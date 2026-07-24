@@ -54,7 +54,7 @@ export default async function AdminPage() {
   const initialHealth = healthRes.success ? healthRes.data : {
     database: 'ONLINE',
     storage: 'ONLINE',
-    openai: 'HEALTHY (180ms)',
+    gemini: 'HEALTHY (180ms)',
     compiler: 'ONLINE',
     uptimeSeconds: 0,
     timestamp: new Date().toISOString()

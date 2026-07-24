@@ -295,7 +295,7 @@ describe('System Administration Server Actions Unit Tests', () => {
       const res = await fetchSystemHealthAction();
       expect(res.success).toBe(true);
       expect(res.data?.database).toBe('ONLINE');
-      expect(res.data?.openai).toContain('HEALTHY');
+      expect(res.data?.gemini).toContain('HEALTHY');
     });
   });
 });

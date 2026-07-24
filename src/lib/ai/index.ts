@@ -10,14 +10,15 @@ export * from './formatter';
 export * from './validator';
 
 export function getAiProvider(preferredProvider?: string): AiProvider {
+  const selectedProvider = preferredProvider || process.env.AI_PROVIDER;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
   const isTest = process.env.NODE_ENV === 'test';
 
-  if (preferredProvider === 'gemini' && geminiKey) {
+  if (selectedProvider === 'gemini' && geminiKey) {
     return new GeminiAiProvider();
   }
-  if (preferredProvider === 'openai' && openAiKey && (isTest || !openAiKey.includes('your-openai-key'))) {
+  if (selectedProvider === 'openai' && openAiKey && (isTest || !openAiKey.includes('your-openai-key'))) {
     return new OpenAiProvider();
   }
 

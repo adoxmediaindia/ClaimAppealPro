@@ -74,6 +74,8 @@ vi.mock('@/lib/prisma', () => ({
 
 // Set process.env to trigger mock completion mode safely
 process.env.OPENAI_API_KEY = 'sk-proj-your-openai-key';
+process.env.GEMINI_API_KEY = 'mock-gemini-key';
+process.env.AI_PROVIDER = 'gemini';
 
 describe('AI Appeal Generation Engine Pipeline Tests', () => {
   beforeEach(() => {
