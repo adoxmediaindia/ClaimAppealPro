@@ -11,11 +11,11 @@ try {
     process.env.DATABASE_URL.includes('pooler.supabase.com')
   );
 
-  if (process.env.VERCEL || isRemoteDb) {
-    console.log('Remote/Vercel environment detected. Running prisma db push...');
+  if (isRemoteDb) {
+    console.log('Remote database detected. Running prisma db push...');
     execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
   } else {
-    console.log('Local database environment. Skipping online db push.');
+    console.log('Local database or no remote database detected. Skipping online db push.');
   }
 
   console.log('Running Next.js production build...');
