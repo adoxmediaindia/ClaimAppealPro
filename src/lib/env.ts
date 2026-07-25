@@ -3,7 +3,6 @@ import log from './logger';
 
 const coreEnvSchema = z.object({
   DATABASE_URL: z.string().url('DATABASE_URL must be a valid connection URL string.').optional().or(z.literal('')),
-  DIRECT_URL: z.string().url('DIRECT_URL must be a valid connection URL string.').optional().or(z.literal('')),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL.').optional().or(z.literal('')),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().or(z.literal('')),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().or(z.literal('')),
