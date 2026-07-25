@@ -183,6 +183,14 @@ export async function loginUser(input: LoginInput): Promise<ActionResponse<{ ema
 
     const userRole = dbUser?.role || 'USER';
 
+    await prisma.auditLog.create({
+      data: {
+        userId: supabaseUser.id,
+        action: 'LOGIN_SUCCESS',
+        details: { email: supabaseUser.email || email },
+      },
+    });
+
     log.info({ correlationId, userId: supabaseUser.id, role: userRole }, 'User login completed successfully');
 
     return {

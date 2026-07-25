@@ -55,7 +55,7 @@ export async function updateProfileAction(input: ProfileInput): Promise<ActionRe
       await prisma.auditLog.create({
         data: {
           userId: user.id,
-          action: 'USER_PROFILE_UPDATED',
+          action: 'PROFILE_UPDATED',
           details: { clinicName, npiNumber },
         },
       });

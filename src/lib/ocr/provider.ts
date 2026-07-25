@@ -13,7 +13,7 @@ export interface OcrField<T> {
 export interface OcrResult {
   rawOcrText: string;
   confidenceScore: number;
-  provider: 'mistral' | 'tesseract';
+  provider: 'mistral' | 'tesseract' | 'native';
   processingTimeMs: number;
 }
 

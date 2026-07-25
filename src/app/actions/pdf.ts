@@ -162,7 +162,7 @@ export async function generatePdfExportAction(
       await tx.auditLog.create({
         data: {
           userId,
-          action: 'PDF_EXPORT_GENERATED',
+          action: 'PDF_EXPORTED',
           ipAddress: '127.0.0.1',
           userAgent: 'Server-Action-Agent',
           details: {
@@ -277,6 +277,41 @@ export async function getPdfSignedUrlAction(
       error: {
         code: err.errorCode || 'SIGNED_URL_FAILED',
         message: err.message || 'Failed to generate signed download URL for exported file.',
+      },
+    };
+  }
+}
+
+/**
+ * Server Action to log a DOCX export event.
+ */
+export async function logDocxExportAction(
+  appealId: string,
+  versionNumber: number
+): Promise<ActionResponse<void>> {
+  try {
+    const userId = await verifyAppealOwnership(appealId);
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DOCX_EXPORTED',
+        ipAddress: '127.0.0.1',
+        userAgent: 'Server-Action-Agent',
+        details: {
+          appealId,
+          versionNumber,
+        },
+      },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: {
+        code: err.errorCode || 'LOG_FAILED',
+        message: err.message || 'Failed to log DOCX export.',
       },
     };
   }

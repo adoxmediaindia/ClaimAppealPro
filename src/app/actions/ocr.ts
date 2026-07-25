@@ -10,6 +10,9 @@ import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import { type ActionResponse } from './auth';
 
+// Use CommonJS require to load pdf-parse to bypass ESM default-export Webpack warnings
+const pdfParse = require('pdf-parse');
+
 export interface OcrProcessingResponse {
   appealId: string;
   fileId: string;
@@ -37,6 +40,15 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
       throw new UnauthorizedError('User session is invalid or expired.');
     }
 
+    // 1. Log OCR start audit event
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'OCR_STARTED',
+        details: { fileId },
+      },
+    });
+
     // Check billing quota limits
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
@@ -58,7 +70,7 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
       throw new ApiError(402, 'QUOTA_EXCEEDED', `Billing quota exceeded: your plan limit is ${planConfig.limit} appeal letters.`);
     }
 
-    // 1. Fetch file record and verify ownership
+    // 2. Fetch file record and verify ownership
     const fileRecord = await prisma.file.findUnique({
       where: { id: fileId },
       include: {
@@ -82,35 +94,61 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
       data: { status: 'ANALYZING' },
     });
 
-    // 2. Fetch binary buffer from Storage bucket
+    // 3. Fetch binary buffer from Storage bucket
     const storage = new SupabaseStorageProvider();
     const fileBuffer = await storage.downloadFile(fileRecord.storagePath);
 
-    // 3. Initiate OCR processing pipeline (Mistral primary -> Tesseract fallback)
-    let ocrResult: OcrResult;
-    const mistral = new MistralOcrProvider();
+    // 4. Initiate OCR processing pipeline (Native PDF parse -> Mistral primary -> Tesseract fallback)
+    let ocrResult: OcrResult | null = null;
+    const startTime = Date.now();
 
-    try {
-      ocrResult = await mistral.extract(fileBuffer, fileRecord.mimeType);
-    } catch (err: any) {
-      log.warn(
-        { correlationId, errorMsg: err.message },
-        'Primary Mistral OCR failed. Activating local Tesseract fallback engine'
-      );
-      
-      const tesseract = new TesseractOcrProvider();
-      ocrResult = await tesseract.extract(fileBuffer, fileRecord.mimeType);
+    if (fileRecord.mimeType === 'application/pdf') {
+      try {
+        log.info({ correlationId }, 'Attempting native PDF text extraction first');
+        const pdfData = await pdfParse(fileBuffer);
+        const extractedText = (pdfData.text || '').trim();
+        
+        // If native extraction finds sufficient text content, use it directly (faster and highly accurate)
+        if (extractedText.length > 150) {
+          log.info({ correlationId, textLength: extractedText.length }, 'Native PDF text extraction succeeded');
+          ocrResult = {
+            rawOcrText: extractedText,
+            confidenceScore: 1.0,
+            provider: 'native',
+            processingTimeMs: Date.now() - startTime,
+          };
+        } else {
+          log.info({ correlationId }, 'Native PDF extracted text too short. Falling back to OCR.');
+        }
+      } catch (pdfErr: any) {
+        log.warn({ correlationId, errorMsg: pdfErr.message }, 'Native PDF parser failed. Falling back to OCR provider.');
+      }
     }
 
-    // 4. Run normalizer parsing
+    if (!ocrResult) {
+      const mistral = new MistralOcrProvider();
+      try {
+        ocrResult = await mistral.extract(fileBuffer, fileRecord.mimeType);
+      } catch (err: any) {
+        log.warn(
+          { correlationId, errorMsg: err.message },
+          'Primary Mistral OCR failed. Activating local Tesseract fallback engine'
+        );
+        
+        const tesseract = new TesseractOcrProvider();
+        ocrResult = await tesseract.extract(fileBuffer, fileRecord.mimeType);
+      }
+    }
+
+    // 5. Run normalizer parsing
     const normalizer = new OcrNormalizer();
     const structuredData = normalizer.normalize(ocrResult);
 
-    // 5. Run validation alerts engine
+    // 6. Run validation alerts engine
     const validator = new OcrValidator();
     const validationReport = validator.validate(structuredData);
 
-    // 6. Update database record with metadata JSON outputs
+    // 7. Update database record with metadata JSON outputs
     await prisma.appeal.update({
       where: { id: fileRecord.appealId },
       data: {
@@ -121,7 +159,7 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
       },
     });
 
-    // 7. Log audit event
+    // 8. Log audit events
     await prisma.auditLog.create({
       data: {
         userId: user.id,
@@ -133,6 +171,18 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
           processingTimeMs: ocrResult.processingTimeMs,
           confidence: ocrResult.confidenceScore,
           warningsCount: validationReport.warnings.length,
+        },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'OCR_COMPLETED',
+        details: {
+          fileId,
+          appealId: fileRecord.appealId,
+          provider: ocrResult.provider,
         },
       },
     });
@@ -149,7 +199,40 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
         providerUsed: ocrResult.provider,
       },
     };
-  } catch (error) {
+  } catch (error: any) {
+    // Attempt to rollback status to DRAFT so user can retry uploading / extraction
+    try {
+      const supabase = await createServerSideClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const fileRecord = await prisma.file.findUnique({
+        where: { id: fileId },
+        select: { appealId: true },
+      });
+
+      if (fileRecord) {
+        await prisma.appeal.update({
+          where: { id: fileRecord.appealId },
+          data: { status: 'DRAFT' },
+        });
+      }
+
+      if (user) {
+        await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: 'OCR_FAILED',
+            details: {
+              fileId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          },
+        });
+      }
+    } catch (dbErr) {
+      log.error({ correlationId }, 'Failed to execute OCR failure database rollback/logging', dbErr);
+    }
+
     if (error instanceof ApiError) {
       return {
         success: false,
@@ -165,7 +248,7 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected internal error occurred.',
+        message: 'An unexpected internal error occurred during text extraction.',
       },
     };
   }

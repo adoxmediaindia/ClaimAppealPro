@@ -80,6 +80,14 @@ vi.mock('@/lib/ocr/provider', () => ({
   },
 }));
 
+vi.mock('pdf-parse', () => {
+  return {
+    default: vi.fn().mockResolvedValue({
+      text: 'Patient Name: Fallback User \nClaim Number: CLM-FALLBACK \nDenial Date: 01/01/2026',
+    }),
+  };
+});
+
 describe('OCR & Document Intelligence Engine Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();

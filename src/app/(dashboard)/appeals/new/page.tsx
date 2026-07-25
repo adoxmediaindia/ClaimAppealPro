@@ -27,6 +27,19 @@ export default function NewAppealPage() {
   const [createdAppealId, setCreatedAppealId] = useState<string | null>(null);
   const appealIdRef = useRef<string | null>(null);
 
+  // Automatically redirect user to details page once all queue uploads finish
+  React.useEffect(() => {
+    const hasUploads = uploads.length > 0;
+    const allCompleted = hasUploads && uploads.every((item) => item.status === 'SUCCESS' || item.status === 'ERROR');
+    const hasSuccess = uploads.some((item) => item.status === 'SUCCESS');
+
+    if (allCompleted && hasSuccess && createdAppealId && !isRegistering) {
+      startTransition(() => {
+        router.push(`/appeals/${createdAppealId}`);
+      });
+    }
+  }, [uploads, createdAppealId, isRegistering, router]);
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();

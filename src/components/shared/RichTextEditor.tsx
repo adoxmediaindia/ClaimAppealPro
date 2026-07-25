@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { saveAppealVersionAction } from '@/app/actions/ai';
+import { logDocxExportAction } from '@/app/actions/pdf';
 
 interface RichTextEditorProps {
   appealId: string;
@@ -142,6 +143,11 @@ export default function RichTextEditor({
   const handleExportDocx = () => {
     if (!editorRef.current) return;
     const content = editorRef.current.innerHTML;
+
+    // Log the DOCX export event in backend audit database
+    logDocxExportAction(appealId, versionNumber).catch((err) => {
+      console.error('Failed to log DOCX export audit event:', err);
+    });
 
     // Compile Microsoft Word-compatible XML document
     const htmlString = `

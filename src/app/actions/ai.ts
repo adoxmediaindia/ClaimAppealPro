@@ -33,6 +33,23 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
       throw new UnauthorizedError('Unauthorized: Authentication required.');
     }
 
+    // Log AI start audit events
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'AI_ANALYSIS_STARTED',
+        details: { appealId },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'APPEAL_GENERATION_STARTED',
+        details: { appealId },
+      },
+    });
+
     // Check billing quota limits
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
@@ -168,7 +185,7 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
         },
       });
 
-      // Write System audit log
+      // Write System audit logs
       await tx.auditLog.create({
         data: {
           userId: user.id,
@@ -179,6 +196,22 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
             tokens: result.usage.totalTokens,
             cost: result.usage.cost,
           },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'AI_ANALYSIS_COMPLETED',
+          details: { appealId: appeal.id },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'APPEAL_GENERATED',
+          details: { appealId: appeal.id, versionNumber: nextVersion },
         },
       });
     });
@@ -194,6 +227,7 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
       { correlationId, appealId, version: nextVersion },
       'AI appeal letter generated and logged successfully'
     );
+
     return {
       success: true,
       data: {
@@ -202,13 +236,38 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
       },
     };
   } catch (error: any) {
-    log.error({ correlationId, error: error.message }, 'Failed to execute AI generation action');
+    log.error({ correlationId, error: error.message }, 'AI appeal generation action failed');
+
+    // Log AI failure audit events
+    try {
+      const supabase = await createServerSideClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: 'AI_ANALYSIS_FAILED',
+            details: { appealId, error: error.message },
+          },
+        });
+        await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: 'APPEAL_GENERATION_FAILED',
+            details: { appealId, error: error.message },
+          },
+        });
+      }
+    } catch (logErr) {
+      log.error({ correlationId }, 'Failed to log AI failure audit events', logErr);
+    }
+
     return {
       success: false,
       error: {
         code: error.errorCode || 'INTERNAL_SERVER_ERROR',
-        message: error.message || 'An unexpected error occurred during appeal letter generation.',
-        details: error.details,
+        message: error.message || 'An unexpected error occurred during AI generation.',
+        details: error.details || null,
       },
     };
   }
