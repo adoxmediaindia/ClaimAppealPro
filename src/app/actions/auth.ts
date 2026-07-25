@@ -176,16 +176,41 @@ export async function loginUser(input: LoginInput): Promise<ActionResponse<{ ema
       throw new UnauthorizedError('Invalid email, incorrect password, or unverified account.');
     }
 
-    const dbUser = await prisma.user.findUnique({
+    let dbUser = await prisma.user.findUnique({
       where: { id: supabaseUser.id },
       select: { role: true },
     });
+
+    if (!dbUser) {
+      log.info({ correlationId, userId: supabaseUser.id, email }, 'Prisma user record missing during login. Synchronizing...');
+      try {
+        dbUser = await prisma.$transaction(async (tx) => {
+          const publicUser = await tx.user.create({
+            data: {
+              id: supabaseUser.id,
+              email: supabaseUser.email || email,
+              role: 'USER',
+            },
+          });
+          await tx.profile.create({
+            data: {
+              userId: publicUser.id,
+              firstName: 'Valued',
+              lastName: 'Provider',
+            },
+          });
+          return publicUser;
+        });
+      } catch (syncErr: any) {
+        log.error({ correlationId, userId: supabaseUser.id, error: syncErr.message }, 'Failed to auto-synchronize missing user on login');
+      }
+    }
 
     const userRole = dbUser?.role || 'USER';
 
     await prisma.auditLog.create({
       data: {
-        userId: supabaseUser.id,
+        userId: dbUser ? supabaseUser.id : null,
         action: 'LOGIN_SUCCESS',
         details: { email: supabaseUser.email || email },
       },

@@ -9,13 +9,7 @@ export class PaddleBillingProvider implements BillingProvider {
     : 'https://sandbox-api.paddle.com';
 
   private isMockMode(): boolean {
-    const key = process.env.PADDLE_API_KEY || '';
-    return (
-      process.env.NODE_ENV === 'test' ||
-      key === '' ||
-      key.includes('mock') ||
-      key.includes('your-paddle-key')
-    );
+    return process.env.NODE_ENV === 'test';
   }
 
   private getApiKey(): string {
