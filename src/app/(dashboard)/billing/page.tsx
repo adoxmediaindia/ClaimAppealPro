@@ -12,29 +12,16 @@ export default async function BillingPage() {
     redirect('/login');
   }
 
-  // Fetch subscription and payment history safely
-  let subscription = null;
-  let payments: any[] = [];
-  let isDbError = false;
+  // Fetch subscription info
+  const subscription = await prisma.subscription.findUnique({
+    where: { userId: user.id },
+  });
 
-  try {
-    subscription = await prisma.subscription.findUnique({
-      where: { userId: user.id },
-    });
-  } catch (err) {
-    console.error('Failed to fetch subscription in billing page:', err);
-    isDbError = true;
-  }
-
-  try {
-    payments = await prisma.payment.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-  } catch (err) {
-    console.error('Failed to fetch payments in billing page:', err);
-    isDbError = true;
-  }
+  // Fetch invoice payment history
+  const payments = await prisma.payment.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+  });
 
   return (
     <div className="space-y-6">
@@ -44,12 +31,6 @@ export default async function BillingPage() {
           Manage your subscription plans, payment methods, and invoices.
         </p>
       </div>
-
-      {isDbError && (
-        <div className="p-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-400 font-semibold">
-          ⚠️ Database connection issue: Subscription details and invoices are temporarily unavailable.
-        </div>
-      )}
 
       <BillingClient 
         initialSubscription={subscription}

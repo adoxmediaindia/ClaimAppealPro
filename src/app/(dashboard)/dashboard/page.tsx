@@ -19,58 +19,42 @@ export default async function DashboardPage() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  let userData: any = null;
-  let appealsThisMonth = 0;
-  let exportedCount = 0;
-  let usageSum: any = { _sum: { tokenCount: 0 } };
-  let isDbError = false;
-
-  try {
-    const [userRes, appealsRes, exportedRes, usageRes] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: user.id },
-        include: {
-          profile: true,
-          subscription: true,
-          appeals: {
-            orderBy: { createdAt: 'desc' },
-            take: 5,
-          },
-          _count: {
-            select: {
-              appeals: true,
-            },
+  const [userData, appealsThisMonth, exportedCount, usageSum] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        profile: true,
+        subscription: true,
+        appeals: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        _count: {
+          select: {
+            appeals: true,
           },
         },
-      }),
-      prisma.appeal.count({
-        where: {
-          userId: user.id,
-          createdAt: { gte: startOfMonth },
-        },
-      }),
-      prisma.appeal.count({
-        where: {
-          userId: user.id,
-          status: 'EXPORTED',
-        },
-      }),
-      prisma.usageLog.aggregate({
-        where: { userId: user.id },
-        _sum: {
-          tokenCount: true,
-        },
-      }),
-    ]);
-
-    userData = userRes;
-    appealsThisMonth = appealsRes;
-    exportedCount = exportedRes;
-    usageSum = usageRes;
-  } catch (err) {
-    console.error('Failed to load dashboard metrics from database:', err);
-    isDbError = true;
-  }
+      },
+    }),
+    prisma.appeal.count({
+      where: {
+        userId: user.id,
+        createdAt: { gte: startOfMonth },
+      },
+    }),
+    prisma.appeal.count({
+      where: {
+        userId: user.id,
+        status: 'EXPORTED',
+      },
+    }),
+    prisma.usageLog.aggregate({
+      where: { userId: user.id },
+      _sum: {
+        tokenCount: true,
+      },
+    }),
+  ]);
 
   const firstName = userData?.profile?.firstName || 'Valued';
   const lastName = userData?.profile?.lastName || 'Provider';
@@ -106,12 +90,6 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </div>
-
-      {isDbError && (
-        <div className="p-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-400 font-semibold">
-          ⚠️ Database connection issue: System is temporarily serving cached or offline-only workspace values.
-        </div>
-      )}
 
       {/* 2. Key Metrics Overview Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

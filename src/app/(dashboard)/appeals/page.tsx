@@ -18,17 +18,11 @@ export default async function AppealsPage() {
     return null;
   }
 
-  let appeals: any[] = [];
-  let isDbError = false;
-  try {
-    appeals = await prisma.appeal.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-  } catch (err) {
-    console.error('Failed to load appeals history from database:', err);
-    isDbError = true;
-  }
+  // Fetch appeals directly from database
+  const appeals = await prisma.appeal.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -51,11 +45,6 @@ export default async function AppealsPage() {
 
       <Card className="border border-white/[0.08] bg-[#14171C] shadow-2xl">
         <CardContent className="p-0">
-          {isDbError && (
-            <div className="p-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-400 m-6">
-              Database connection error: System is temporarily unable to retrieve appeals history.
-            </div>
-          )}
           {appeals.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#101216] text-zinc-450 border border-white/[0.08]">
@@ -102,7 +91,7 @@ export default async function AppealsPage() {
                         <TableCell className="text-xs text-zinc-300">
                           {payor}
                         </TableCell>
-                        <TableCell className="text-zinc-450 text-xs font-mono">
+                        <TableCell className="text-zinc-455 text-xs font-mono">
                           {new Date(appeal.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell>

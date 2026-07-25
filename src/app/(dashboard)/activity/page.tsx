@@ -16,19 +16,12 @@ export default async function ActivityHistoryPage() {
     redirect('/login');
   }
 
-  // Fetch all audit logs for the current user safely
-  let logs: any[] = [];
-  let isDbError = false;
-  try {
-    logs = await prisma.auditLog.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
-  } catch (error) {
-    console.error('Failed to fetch audit logs from database:', error);
-    isDbError = true;
-  }
+  // Fetch all audit logs for the current user
+  const logs = await prisma.auditLog.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
 
   const getLogIcon = (action: string) => {
     switch (action) {
@@ -92,11 +85,6 @@ export default async function ActivityHistoryPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {isDbError && (
-            <div className="p-4 mx-6 my-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-455">
-              Database connection error: System is temporarily unable to retrieve activity logs.
-            </div>
-          )}
           {logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#101216] text-zinc-550 border border-white/[0.08]">
