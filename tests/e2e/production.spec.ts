@@ -8,7 +8,7 @@ test.describe('Production Readiness & Hardening E2E Tests', () => {
     const json = await response.json();
     expect(json.status).toBe('HEALTHY');
     expect(json.details.database).toBe('ONLINE');
-    expect(json.details.openai).toBe('ONLINE');
+    expect(json.details.gemini).toBe('ONLINE');
     expect(json.details.storage).toBe('ONLINE');
   });
 

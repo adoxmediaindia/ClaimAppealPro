@@ -13,12 +13,11 @@ export function getAiProvider(preferredProvider?: string): AiProvider {
   const selectedProvider = preferredProvider || process.env.AI_PROVIDER;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
-  const isTest = process.env.NODE_ENV === 'test';
 
-  if (selectedProvider === 'gemini' && geminiKey) {
+  if (selectedProvider === 'gemini') {
     return new GeminiAiProvider();
   }
-  if (selectedProvider === 'openai' && openAiKey && (isTest || !openAiKey.includes('your-openai-key'))) {
+  if (selectedProvider === 'openai') {
     return new OpenAiProvider();
   }
 
@@ -28,7 +27,7 @@ export function getAiProvider(preferredProvider?: string): AiProvider {
     return new GeminiAiProvider();
   }
 
-  if (openAiKey && openAiKey.trim() !== '' && (isTest || !openAiKey.includes('your-openai-key'))) {
+  if (openAiKey && openAiKey.trim() !== '') {
     log.info({}, 'Selected OpenAI as active AI Provider');
     return new OpenAiProvider();
   }
@@ -38,3 +37,4 @@ export function getAiProvider(preferredProvider?: string): AiProvider {
 }
 
 export default getAiProvider;
+

@@ -6,7 +6,7 @@ import log from '@/lib/logger';
 import { ApiError } from '@/lib/errors';
 
 export class GeminiAiProvider implements AiProvider {
-  private model = 'gemini-1.5-flash';
+  private model = 'gemini-2.5-flash';
   private client: GoogleGenAI | null = null;
 
   private isMockMode(): boolean {
@@ -82,16 +82,7 @@ export class GeminiAiProvider implements AiProvider {
 
     const systemInstruction = `You are an expert clinical coding and health insurance appeal writer.
 You write highly detailed, professional, and convincing appeal letters.
-You must output ONLY a valid JSON object matching the following structure:
-{
-  "title": "String title",
-  "executiveSummary": "String executive summary block",
-  "medicalNecessity": "String detailed medical necessity argument block",
-  "policyArgument": "String policy terms block",
-  "supportingEvidence": "String supporting documents checklist block",
-  "closingRequest": "String closing block requesting reversal"
-}
-Ensure all keys are populated and no values are empty or truncated. Do not include markdown code block formatting like \`\`\`json.`;
+You must output ONLY a valid JSON object matching the requested schema.`;
 
     let client: GoogleGenAI;
     try {
@@ -117,6 +108,18 @@ Ensure all keys are populated and no values are empty or truncated. Do not inclu
           config: {
             temperature: 0.2,
             responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                title: { type: 'STRING' },
+                executiveSummary: { type: 'STRING' },
+                medicalNecessity: { type: 'STRING' },
+                policyArgument: { type: 'STRING' },
+                supportingEvidence: { type: 'STRING' },
+                closingRequest: { type: 'STRING' }
+              },
+              required: ['title', 'executiveSummary', 'medicalNecessity', 'policyArgument', 'supportingEvidence', 'closingRequest']
+            }
           },
         });
 
@@ -131,14 +134,12 @@ Ensure all keys are populated and no values are empty or truncated. Do not inclu
           throw new ApiError(500, 'GEMINI_RESPONSE_EMPTY', 'Gemini returned an empty completion response.');
         }
 
-        // Clean potential code block backticks if present
-        const cleanedJson = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-        const parsed = JSON.parse(cleanedJson);
+        const parsed = JSON.parse(rawText.trim());
 
         const promptTokens = response.usageMetadata?.promptTokenCount || 200;
         const completionTokens = response.usageMetadata?.candidatesTokenCount || 400;
         const totalTokens = response.usageMetadata?.totalTokenCount || (promptTokens + completionTokens);
-        // Gemini 1.5 Flash cost: ~ $0.000075 / 1k input tokens, $0.0003 / 1k output tokens
+        // Gemini 2.5 Flash cost: ~ $0.000075 / 1k input tokens, $0.0003 / 1k output tokens
         const cost = (promptTokens * 0.000000075) + (completionTokens * 0.0000003);
 
         const result: AppealResult = {
@@ -187,12 +188,31 @@ Ensure all keys are populated and no values are empty or truncated. Do not inclu
     }
 
     const statusCode = lastError?.status || 500;
-    const isRateLimit = statusCode === 429 || lastError?.message?.includes('429') || lastError?.message?.includes('ResourceExhausted');
-    const errorCode = isRateLimit ? 'GEMINI_RATE_LIMIT' : 'GEMINI_API_ERROR';
-    const message = isRateLimit 
-      ? 'Gemini API rate limit exceeded. Please try again in a few moments.' 
-      : `Gemini appeal generation failed: ${lastError?.message || 'Unknown error'}`;
+    const errorMessage = lastError?.message || '';
+    
+    // Map specific Gemini errors to user-friendly messages
+    let errorCode = 'GEMINI_API_ERROR';
+    let userMessage = `Gemini appeal generation failed: ${errorMessage || 'Unknown error'}`;
 
-    throw new ApiError(statusCode, errorCode, message);
+    const isRateLimit = statusCode === 429 || errorMessage.includes('429') || errorMessage.includes('ResourceExhausted') || errorMessage.includes('Quota');
+    const isAuthError = statusCode === 401 || statusCode === 403 || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('not valid') || errorMessage.includes('Unauthorized');
+    const isUnavailable = statusCode === 503 || errorMessage.includes('503') || errorMessage.includes('Unavailable') || errorMessage.includes('maintenance');
+
+    if (isRateLimit) {
+      errorCode = 'GEMINI_RATE_LIMIT';
+      userMessage = 'Gemini API rate limit exceeded or quota exhausted. Please try again in a few moments.';
+    } else if (isAuthError) {
+      errorCode = 'GEMINI_KEY_INVALID';
+      userMessage = 'Gemini API key is invalid or not authorized. Please verify your GEMINI_API_KEY environment variable.';
+    } else if (isUnavailable) {
+      errorCode = 'GEMINI_SERVICE_UNAVAILABLE';
+      userMessage = 'Gemini service is currently unavailable or undergoing maintenance. Please try again later.';
+    } else if (lastError instanceof SyntaxError) {
+      errorCode = 'GEMINI_MALFORMED_RESPONSE';
+      userMessage = 'Gemini returned a malformed response that could not be parsed. Please retry.';
+    }
+
+    throw new ApiError(statusCode, errorCode, userMessage);
   }
 }
+

@@ -44,7 +44,7 @@ test.describe('Enterprise Admin Dashboard & Operations E2E Tests', () => {
       auditLogs: [] as any[],
       featureFlags: [
         { id: 'flag-1', key: 'OCR_FALLBACK_ENABLED', value: true, description: 'Bypasses Mistral failures to Tesseract local client.' },
-        { id: 'flag-2', key: 'AI_TEMPLATE_RETRY_ENABLED', value: true, description: 'Retries OpenAI completion requests upon timeout errors.' },
+        { id: 'flag-2', key: 'AI_TEMPLATE_RETRY_ENABLED', value: true, description: 'Retries Gemini completion requests upon timeout errors.' },
       ],
     };
 

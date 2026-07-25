@@ -14,7 +14,7 @@ async function main() {
     {
       key: 'ai-generation-enabled',
       value: true,
-      description: 'Toggles the OpenAI GPT-4o-mini generation service availability.',
+      description: 'Toggles the Google Gemini generation service availability.',
     },
   ];
 
