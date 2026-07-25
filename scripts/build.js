@@ -4,18 +4,13 @@ try {
   console.log('Generating Prisma Client...');
   execSync('npx prisma generate', { stdio: 'inherit' });
 
-  // Sync schema to DB if on Vercel or database URL points to a remote Supabase host
-  const isRemoteDb = process.env.DATABASE_URL && (
-    process.env.DATABASE_URL.includes('supabase.co') || 
-    process.env.DATABASE_URL.includes('supabase.com') ||
-    process.env.DATABASE_URL.includes('pooler.supabase.com')
-  );
+  const isVercelBuild = process.env.VERCEL === '1' && process.env.DATABASE_URL;
 
-  if (isRemoteDb) {
-    console.log('Remote database detected. Running prisma db push...');
+  if (isVercelBuild) {
+    console.log('Vercel build detected. Running prisma db push to synchronize database schema...');
     execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
   } else {
-    console.log('Local database or no remote database detected. Skipping online db push.');
+    console.log('Local build environment. Skipping database schema push.');
   }
 
   console.log('Running Next.js production build...');
