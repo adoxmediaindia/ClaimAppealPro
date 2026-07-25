@@ -29,21 +29,38 @@ export default async function AppealReviewPage({ params, searchParams }: AppealR
     redirect('/login');
   }
 
-  // 1. Fetch Appeal and its associated uploads, versions, and metrics logs
-  const appeal = await prisma.appeal.findUnique({
-    where: { id: appealId },
-    include: {
-      files: {
-        take: 1, // Focus on the primary uploaded claim document
+  // 1. Fetch Appeal and its associated uploads, versions, and metrics logs safely
+  let appeal: any = null;
+  let isDbError = false;
+  try {
+    appeal = await prisma.appeal.findUnique({
+      where: { id: appealId },
+      include: {
+        files: {
+          take: 1, // Focus on the primary uploaded claim document
+        },
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+        },
+        aiGenerations: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
-      versions: {
-        orderBy: { versionNumber: 'desc' },
-      },
-      aiGenerations: {
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  });
+    });
+  } catch (err) {
+    console.error('Failed to fetch appeal details in page:', err);
+    isDbError = true;
+  }
+
+  if (isDbError) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto space-y-4">
+        <div className="p-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-400 font-semibold">
+          Database connection error: System is temporarily unable to retrieve this appeal. Please try again.
+        </div>
+      </div>
+    );
+  }
 
   // 2. Validate ownership (BOLA prevention)
   if (!appeal || appeal.deletedAt || appeal.userId !== user.id) {

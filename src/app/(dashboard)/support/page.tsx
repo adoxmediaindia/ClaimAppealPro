@@ -15,20 +15,26 @@ export default async function SupportPage() {
     redirect('/login');
   }
 
-  // Fetch user support tickets from database
-  const tickets = await prisma.supportTicket.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-  });
+  // Fetch user support tickets safely from database
+  let initialTickets: any[] = [];
+  let isDbError = false;
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
 
-  // Map to matching client-side interface types safely
-  const initialTickets = tickets.map((t) => ({
-    id: t.id,
-    subject: t.subject,
-    message: t.message,
-    status: t.status as 'OPEN' | 'IN_PROGRESS' | 'RESOLVED',
-    createdAt: t.createdAt.toISOString(),
-  }));
+    initialTickets = tickets.map((t) => ({
+      id: t.id,
+      subject: t.subject,
+      message: t.message,
+      status: t.status as 'OPEN' | 'IN_PROGRESS' | 'RESOLVED',
+      createdAt: t.createdAt.toISOString(),
+    }));
+  } catch (err) {
+    console.error('Failed to fetch support tickets in page:', err);
+    isDbError = true;
+  }
 
   return (
     <div className="space-y-6">
@@ -41,6 +47,12 @@ export default async function SupportPage() {
           Open support tickets or consult platform technical documentation.
         </p>
       </div>
+
+      {isDbError && (
+        <div className="p-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-450 font-semibold animate-pulse">
+          ⚠️ Database connection issue: Support history is currently offline. You can still open new support messages.
+        </div>
+      )}
 
       <SupportClient initialTickets={initialTickets} />
     </div>

@@ -16,29 +16,40 @@ export default async function ActivityHistoryPage() {
     redirect('/login');
   }
 
-  // Fetch all audit logs for the current user
-  const logs = await prisma.auditLog.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  });
+  // Fetch all audit logs for the current user safely
+  let logs: any[] = [];
+  let isDbError = false;
+  try {
+    logs = await prisma.auditLog.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+  } catch (error) {
+    console.error('Failed to fetch audit logs from database:', error);
+    isDbError = true;
+  }
 
   const getLogIcon = (action: string) => {
     switch (action) {
       case 'LOGIN':
+      case 'LOGIN_SUCCESS':
       case 'SIGN_IN':
-        return <LogIn className="h-4 w-4 text-emerald-450" />;
+        return <LogIn className="h-4 w-4 text-emerald-400" />;
       case 'LOGOUT':
       case 'SIGN_OUT':
-        return <LogOut className="h-4 w-4 text-rose-450" />;
+        return <LogOut className="h-4 w-4 text-rose-400" />;
       case 'GENERATE_AI_APPEAL':
       case 'APPEAL_VERSION_SAVED':
       case 'AI_USED':
-        return <Sparkles className="h-4 w-4 text-sky-450" />;
+      case 'AI_ANALYSIS_COMPLETED':
+      case 'APPEAL_GENERATED':
+        return <Sparkles className="h-4 w-4 text-sky-400" />;
       case 'APPEAL_CREATED':
       case 'APPEAL_EDITED':
       case 'APPEAL_DELETED':
       case 'FILE_OCR_PROCESS_COMPLETE':
+      case 'OCR_COMPLETED':
         return <FileText className="h-4 w-4 text-[#4F8CFF]" />;
       case 'PADDLE_CHECKOUT_COMPLETED':
       case 'PADDLE_INVOICE_PAID':
@@ -47,13 +58,14 @@ export default async function ActivityHistoryPage() {
         return <CreditCard className="h-4 w-4 text-[#6EE7F9]" />;
       case 'PROFILE_UPDATED':
       case 'REGISTER':
-        return <User className="h-4 w-4 text-purple-450" />;
+        return <User className="h-4 w-4 text-purple-400" />;
       default:
-        return <Activity className="h-4 w-4 text-zinc-450" />;
+        return <Activity className="h-4 w-4 text-zinc-400" />;
     }
   };
 
   const getFriendlyActionName = (action: string) => {
+    if (!action) return 'Unknown Action';
     return action
       .replace(/_/g, ' ')
       .toLowerCase()
@@ -67,7 +79,7 @@ export default async function ActivityHistoryPage() {
           <Activity className="h-6 w-6 text-[#4F8CFF]" />
           <span>Activity History</span>
         </h1>
-        <p className="text-xs text-zinc-450 mt-1">
+        <p className="text-xs text-zinc-400 mt-1">
           Detailed audit logs of account events, billing updates, and AI actions.
         </p>
       </div>
@@ -75,11 +87,16 @@ export default async function ActivityHistoryPage() {
       <Card className="border border-white/[0.08] bg-[#14171C] shadow-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Account Audit Trails</CardTitle>
-          <CardDescription className="text-xs text-zinc-450">
+          <CardDescription className="text-xs text-zinc-400">
             Displays up to 50 most recent security and feature actions.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
+          {isDbError && (
+            <div className="p-4 mx-6 my-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-455">
+              Database connection error: System is temporarily unable to retrieve activity logs.
+            </div>
+          )}
           {logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#101216] text-zinc-550 border border-white/[0.08]">
@@ -102,22 +119,42 @@ export default async function ActivityHistoryPage() {
               </TableHeader>
               <TableBody>
                 {logs.map((log) => {
-                  const detailsString = log.details ? JSON.stringify(log.details) : 'N/A';
+                  let detailsString = 'N/A';
+                  try {
+                    detailsString = log.details ? JSON.stringify(log.details) : 'N/A';
+                  } catch (e) {
+                    detailsString = 'Malformed details';
+                  }
+
+                  let friendlyAction = 'Unknown Action';
+                  try {
+                    friendlyAction = log.action ? getFriendlyActionName(log.action) : 'Unknown Action';
+                  } catch (e) {
+                    friendlyAction = String(log.action || 'Unknown Action');
+                  }
+
+                  let formattedDate = 'N/A';
+                  try {
+                    formattedDate = log.createdAt ? new Date(log.createdAt).toLocaleString() : 'N/A';
+                  } catch (e) {
+                    formattedDate = 'Invalid Date';
+                  }
+
                   return (
                     <TableRow key={log.id} className="border-b border-white/[0.08] hover:bg-white/[0.02]">
                       <TableCell className="py-3">
                         <div className="flex h-7 w-7 items-center justify-center rounded bg-[#101216] border border-white/[0.08]">
-                          {getLogIcon(log.action)}
+                          {getLogIcon(log.action || '')}
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold text-zinc-200 text-xs py-3">
-                        {getFriendlyActionName(log.action)}
+                        {friendlyAction}
                       </TableCell>
-                      <TableCell className="text-zinc-450 text-xs font-mono max-w-[200px] sm:max-w-md truncate py-3" title={detailsString}>
+                      <TableCell className="text-zinc-400 text-xs font-mono max-w-[200px] sm:max-w-md truncate py-3" title={detailsString}>
                         {detailsString}
                       </TableCell>
                       <TableCell className="text-zinc-500 text-xs text-right py-3 font-mono">
-                        {new Date(log.createdAt).toLocaleString()}
+                        {formattedDate}
                       </TableCell>
                     </TableRow>
                   );

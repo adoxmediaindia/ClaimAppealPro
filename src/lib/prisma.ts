@@ -396,15 +396,7 @@ export const prisma = new Proxy(realPrisma, {
           try {
             return await realMethod.apply(modelTarget, args);
           } catch (error: any) {
-            const errorMsg = error.message || '';
-            const errorCode = error.code || '';
-            const isDbOffline =
-              process.env.NODE_ENV === 'test' ||
-              errorCode.startsWith('P') ||
-              errorMsg.includes('Prisma') ||
-              errorMsg.includes('Can\'t reach database') ||
-              errorMsg.includes('credentials') ||
-              errorMsg.includes('Authentication failed');
+            const isDbOffline = process.env.NODE_ENV === 'test';
 
 
             if (isDbOffline) {

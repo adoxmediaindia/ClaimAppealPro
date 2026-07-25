@@ -14,10 +14,17 @@ export default async function SettingsPage() {
     redirect('/login');
   }
 
-  // Fetch user profile from database
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
+  // Fetch user profile safely from database
+  let profile = null;
+  let isDbError = false;
+  try {
+    profile = await prisma.profile.findUnique({
+      where: { userId: user.id },
+    });
+  } catch (err) {
+    console.error('Failed to fetch user profile in settings:', err);
+    isDbError = true;
+  }
 
   const initialProfile = {
     firstName: profile?.firstName || '',
@@ -36,6 +43,12 @@ export default async function SettingsPage() {
           Customize your profile, clinical configurations, and NPI identifiers.
         </p>
       </div>
+
+      {isDbError && (
+        <div className="p-4 text-xs rounded border border-rose-900 bg-rose-955/20 text-rose-400 font-semibold">
+          ⚠️ Database connection issue: Profile details could not be loaded from database. Settings are read-only.
+        </div>
+      )}
 
       <SettingsForm initialProfile={initialProfile} />
     </div>
