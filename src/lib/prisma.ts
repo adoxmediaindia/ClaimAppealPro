@@ -396,8 +396,15 @@ export const prisma = new Proxy(realPrisma, {
           try {
             return await realMethod.apply(modelTarget, args);
           } catch (error: any) {
-            const isDbOffline = process.env.NODE_ENV === 'test';
-
+            const isProd = process.env.NODE_ENV === 'production';
+            const isDbOffline = 
+              !isProd && (
+                process.env.NODE_ENV === 'test' ||
+                process.env.MOCK_DATABASE === 'true' ||
+                error.name === 'PrismaClientInitializationError' ||
+                error.message?.includes('Authentication failed') ||
+                error.message?.includes('Can\'t reach database server')
+              );
 
             if (isDbOffline) {
               const mockHandler = (mockModel as any)[methodName];

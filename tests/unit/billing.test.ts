@@ -14,6 +14,7 @@ const hoisted = vi.hoisted(() => {
   const mockSubUpdate = vi.fn();
   const mockPaymentCreate = vi.fn();
   const mockPaymentFindMany = vi.fn();
+  const mockPaymentFindUnique = vi.fn();
   const mockAuditLogCreate = vi.fn();
   const mockFileFindUnique = vi.fn();
   const mockAppealFindUnique = vi.fn();
@@ -30,6 +31,7 @@ const hoisted = vi.hoisted(() => {
     payment: {
       create: mockPaymentCreate,
       findMany: mockPaymentFindMany,
+      findUnique: mockPaymentFindUnique,
     },
     auditLog: {
       create: mockAuditLogCreate,
@@ -50,6 +52,7 @@ const hoisted = vi.hoisted(() => {
     mockSubUpdate,
     mockPaymentCreate,
     mockPaymentFindMany,
+    mockPaymentFindUnique,
     mockAuditLogCreate,
     mockFileFindUnique,
     mockAppealFindUnique,
@@ -76,6 +79,7 @@ vi.mock('@/lib/prisma', () => ({
 describe('Billing & Subscription System Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.mockPaymentFindUnique.mockResolvedValue(null);
     process.env.STRIPE_SECRET_KEY = 'sk_test_mock-stripe-secret-key';
     process.env.STRIPE_WEBHOOK_SECRET = 'mock-stripe-webhook';
   });

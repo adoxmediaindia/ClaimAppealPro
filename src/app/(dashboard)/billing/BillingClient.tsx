@@ -215,8 +215,8 @@ export default function BillingClient({ initialSubscription, initialPayments, us
                           {payment.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-[10px] text-zinc-500 font-mono">
-                        {payment.stripeSessionId}
+                      <TableCell className="text-[10px] text-zinc-550 font-mono">
+                        {payment.paddleSessionId}
                       </TableCell>
                     </TableRow>
                   ))}

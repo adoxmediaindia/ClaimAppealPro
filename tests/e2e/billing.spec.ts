@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
-test.describe('Stripe Billing & Subscriptions E2E Tests', () => {
-  const stateFilePath = 'C:\\Users\\prati\\.gemini\\antigravity\\brain\\99ddbc12-2335-4f25-804f-324c844e6864\\scratch\\mock_db_state.json';
+test.describe('Paddle Billing & Subscriptions E2E Tests', () => {
+  const stateFilePath = path.join(os.tmpdir(), 'claimappealpro_mock_db', 'mock_db_state.json');
 
   test.beforeEach(async ({ context }) => {
     // Reset file-persisted mock database status to default with active free tier
@@ -11,8 +13,8 @@ test.describe('Stripe Billing & Subscriptions E2E Tests', () => {
       subscription: {
         id: 'mock-sub-id',
         userId: 'mock-uuid',
-        stripeCustomerId: 'cus_mock-customer-id',
-        stripeSubscriptionId: 'sub_mock-subscription-id',
+        paddleCustomerId: 'cus_mock-customer-id',
+        paddleSubscriptionId: 'sub_mock-subscription-id',
         planId: 'free',
         status: 'active',
         currentPeriodStart: new Date().toISOString(),
@@ -67,23 +69,23 @@ test.describe('Stripe Billing & Subscriptions E2E Tests', () => {
     // Wait for mock checkout session URL routing
     await page.waitForURL(/session_id=mock_session_/);
 
-    // Simulate Stripe payment success webhook post event
-    const webhookResponse = await request.post('http://localhost:3000/api/webhooks/stripe', {
+    // Simulate Paddle payment success webhook post event
+    const webhookResponse = await request.post('http://localhost:3000/api/webhooks/paddle', {
       headers: {
-        'stripe-signature': 'mock-webhook-signature',
+        'paddle-signature': 'mock-webhook-signature',
       },
       data: {
-        type: 'checkout.session.completed',
+        event_type: 'subscription.created',
         data: {
-          object: {
-            customer: 'cus_mock-customer-id',
-            subscription: 'sub_mock-subscription-id',
-            amount_total: 4900,
-            currency: 'usd',
-            metadata: {
-              userId: 'mock-uuid',
-            },
+          customer_id: 'cus_mock-customer-id',
+          id: 'sub_mock-subscription-id',
+          custom_data: {
+            userId: 'mock-uuid',
           },
+          next_billing_period: {
+            amount: 4900,
+          },
+          currency_code: 'USD',
         },
       },
     });

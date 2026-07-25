@@ -18,6 +18,7 @@ export interface BillingEvent {
   currentPeriodEnd?: Date;
   cancelAtPeriodEnd?: boolean;
   metadata?: Record<string, any>;
+  transactionId?: string;
 }
 
 export interface BillingProvider {

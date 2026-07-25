@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 test.describe('PDF Print & Export E2E Tests', () => {
 
   test.beforeEach(async ({ context }) => {
     // Write dynamic mock state to state file with GENERATED status and appeal version seeded
-    const stateFilePath = 'C:\\Users\\prati\\.gemini\\antigravity\\brain\\99ddbc12-2335-4f25-804f-324c844e6864\\scratch\\mock_db_state.json';
+    const stateFilePath = path.join(os.tmpdir(), 'claimappealpro_mock_db', 'mock_db_state.json');
     
     const seededState = {
       appeal: {

@@ -9,6 +9,9 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional().default(''),
   AI_PROVIDER: z.string().optional().default(''),
   ANTHROPIC_API_KEY: z.string().optional().default(''),
+  PADDLE_API_KEY: z.string().optional().default(''),
+  PADDLE_WEBHOOK_SECRET: z.string().optional().default(''),
+  PADDLE_ENV: z.string().optional().default('sandbox'),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
   RAZORPAY_KEY_ID: z.string().optional().default(''),
@@ -18,7 +21,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional().default(''),
   MISTRAL_API_KEY: z.string().optional().default(''),
   APP_URL: z.string().default('http://localhost:3000'),
-  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
 const getEnv = () => {
@@ -31,6 +34,9 @@ const getEnv = () => {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     AI_PROVIDER: process.env.AI_PROVIDER,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    PADDLE_API_KEY: process.env.PADDLE_API_KEY,
+    PADDLE_WEBHOOK_SECRET: process.env.PADDLE_WEBHOOK_SECRET,
+    PADDLE_ENV: process.env.PADDLE_ENV,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
@@ -54,6 +60,9 @@ const getEnv = () => {
       GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
       AI_PROVIDER: process.env.AI_PROVIDER || '',
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+      PADDLE_API_KEY: process.env.PADDLE_API_KEY || '',
+      PADDLE_WEBHOOK_SECRET: process.env.PADDLE_WEBHOOK_SECRET || '',
+      PADDLE_ENV: process.env.PADDLE_ENV || 'sandbox',
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
       RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || '',

@@ -7,10 +7,10 @@ try {
   const isVercelBuild = process.env.VERCEL === '1' && process.env.DATABASE_URL;
 
   if (isVercelBuild) {
-    console.log('Vercel build detected. Running prisma db push to synchronize database schema...');
-    execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
+    console.log('Vercel build detected. Running prisma migrate deploy to apply database migrations...');
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
   } else {
-    console.log('Local build environment. Skipping database schema push.');
+    console.log('Local build environment. Skipping database migrations deployment.');
   }
 
   console.log('Running Next.js production build...');

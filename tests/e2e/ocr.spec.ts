@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 
 test.describe('OCR Review Experience E2E Tests', () => {
 
   test.beforeEach(async ({ context }) => {
     // Reset file-based mock DB state to default READY status
-    const stateFilePath = 'C:\\Users\\prati\\.gemini\\antigravity\\brain\\99ddbc12-2335-4f25-804f-324c844e6864\\scratch\\mock_db_state.json';
+    const stateFilePath = path.join(os.tmpdir(), 'claimappealpro_mock_db', 'mock_db_state.json');
     if (fs.existsSync(stateFilePath)) {
       try {
         fs.unlinkSync(stateFilePath);

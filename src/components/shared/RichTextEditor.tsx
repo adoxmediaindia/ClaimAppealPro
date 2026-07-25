@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { saveAppealVersionAction } from '@/app/actions/ai';
-import { logDocxExportAction } from '@/app/actions/pdf';
 
 interface RichTextEditorProps {
   appealId: string;
@@ -141,55 +140,13 @@ export default function RichTextEditor({
   };
 
   const handleExportDocx = () => {
-    if (!editorRef.current) return;
-    const content = editorRef.current.innerHTML;
-
-    // Log the DOCX export event in backend audit database
-    logDocxExportAction(appealId, versionNumber).catch((err) => {
-      console.error('Failed to log DOCX export audit event:', err);
-    });
-
-    // Compile Microsoft Word-compatible XML document
-    const htmlString = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <title>Insurance Appeal Letter</title>
-        <!--[if gte mso 9]>
-        <xml>
-          <w:WordDocument>
-            <w:View>Print</w:View>
-            <w:Zoom>100</w:Zoom>
-          </w:WordDocument>
-        </xml>
-        <![endif]-->
-        <style>
-          body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #000000; }
-          table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-          th, td { border: 1px solid #000000; padding: 8px; text-align: left; }
-          h1 { font-size: 18pt; margin-top: 12pt; margin-bottom: 6pt; }
-          h2 { font-size: 14pt; margin-top: 12pt; margin-bottom: 6pt; }
-          h3 { font-size: 12pt; margin-top: 12pt; margin-bottom: 6pt; }
-          p { margin: 0 0 12pt 0; }
-        </style>
-      </head>
-      <body>
-        ${content}
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\ufeff' + htmlString], {
-      type: 'application/msword;charset=utf-8',
-    });
-
-    const url = URL.createObjectURL(blob);
+    const downloadUrl = `/api/exports/docx?appealId=${appealId}&versionNumber=${versionNumber}`;
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `insurance_appeal_letter_v${versionNumber}.doc`;
+    a.href = downloadUrl;
+    a.download = `insurance_appeal_letter_v${versionNumber}.docx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const handleExportPdf = () => {

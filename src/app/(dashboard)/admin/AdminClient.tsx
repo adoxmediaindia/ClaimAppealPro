@@ -236,7 +236,7 @@ export default function AdminClient({
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-white">${(stats.totalRevenue || 0).toFixed(2)}</div>
-                <p className="text-[10px] text-zinc-550 mt-1">Aggregated Stripe processing</p>
+                <p className="text-[10px] text-zinc-550 mt-1">Aggregated Paddle processing</p>
               </CardContent>
             </Card>
 
@@ -516,7 +516,7 @@ export default function AdminClient({
                 <CheckCircle className="h-4 w-4 text-[#10B981] shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-zinc-200">Webhooks Verification</h4>
-                  <p className="text-[10px] text-zinc-550 mt-0.5">Stripe webhook endpoint signatures verified.</p>
+                  <p className="text-[10px] text-zinc-550 mt-0.5">Paddle webhook endpoint signatures verified.</p>
                 </div>
               </div>
             </CardContent>

@@ -9,7 +9,15 @@ export class PaddleBillingProvider implements BillingProvider {
     : 'https://sandbox-api.paddle.com';
 
   private isMockMode(): boolean {
-    return process.env.NODE_ENV === 'test';
+    return (
+      process.env.NODE_ENV === 'test' ||
+      (process.env.NODE_ENV !== 'production' && (
+        process.env.MOCK_BILLING === 'true' ||
+        process.env.PADDLE_API_KEY === 'mock-paddle-key' ||
+        !process.env.PADDLE_API_KEY ||
+        process.env.PADDLE_API_KEY.includes('your-paddle-key')
+      ))
+    );
   }
 
   private getApiKey(): string {
@@ -136,7 +144,9 @@ export class PaddleBillingProvider implements BillingProvider {
   async constructWebhookEvent(rawBody: string, signature: string, secret: string): Promise<BillingEvent> {
     log.info({}, 'Verifying Paddle webhook signature');
 
-    if (this.isMockMode()) {
+    const isMockSignature = signature === 'mock-webhook-signature' && process.env.NODE_ENV !== 'production';
+
+    if (this.isMockMode() || isMockSignature) {
       log.info({}, 'Executing mock Paddle webhook verification');
       try {
         const parsed = JSON.parse(rawBody);
@@ -238,6 +248,7 @@ export class PaddleBillingProvider implements BillingProvider {
           subscriptionId: data.subscription_id || '',
           amount: data.details?.totals?.grand_total || 0,
           currency: data.currency_code || 'USD',
+          transactionId: data.id || '',
         };
 
       default:

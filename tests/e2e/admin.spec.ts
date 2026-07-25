@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 test.describe('Enterprise Admin Dashboard & Operations E2E Tests', () => {
-  // Fallback to local appData path if Temp path is not matching prisma.ts
-  const actualStateFilePath = 'C:\\Users\\prati\\.gemini\\antigravity\\brain\\99ddbc12-2335-4f25-804f-324c844e6864\\scratch\\mock_db_state.json';
+  const actualStateFilePath = path.join(os.tmpdir(), 'claimappealpro_mock_db', 'mock_db_state.json');
 
   test.beforeEach(() => {
     // Re-seed mock database state with administrative users and configs
@@ -12,8 +13,8 @@ test.describe('Enterprise Admin Dashboard & Operations E2E Tests', () => {
       subscription: {
         id: 'mock-sub-id',
         userId: 'mock-uuid',
-        stripeCustomerId: 'cus_mock-customer-id',
-        stripeSubscriptionId: 'sub_mock-subscription-id',
+        paddleCustomerId: 'cus_mock-customer-id',
+        paddleSubscriptionId: 'sub_mock-subscription-id',
         planId: 'free',
         status: 'active',
         currentPeriodStart: new Date().toISOString(),
@@ -21,7 +22,7 @@ test.describe('Enterprise Admin Dashboard & Operations E2E Tests', () => {
         cancelAtPeriodEnd: false,
       },
       payments: [
-        { id: 'pay-1', amount: 4900, currency: 'usd', createdAt: new Date().toISOString() }
+        { id: 'pay-1', amount: 4900, currency: 'usd', createdAt: new Date().toISOString(), paddleSessionId: 'pay-1' }
       ],
       users: [
         {

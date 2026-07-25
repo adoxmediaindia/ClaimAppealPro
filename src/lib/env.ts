@@ -13,6 +13,9 @@ const optionalEnvSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   AI_PROVIDER: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
+  PADDLE_API_KEY: z.string().optional(),
+  PADDLE_WEBHOOK_SECRET: z.string().optional(),
+  PADDLE_ENV: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
@@ -22,7 +25,7 @@ const optionalEnvSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   MISTRAL_API_KEY: z.string().optional(),
   APP_URL: z.string().optional(),
-  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).optional(),
+  NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
 });
 
 export function validateEnvironment() {
@@ -49,6 +52,7 @@ export function validateEnvironment() {
     if (data.OPENAI_API_KEY) activeProviders.push('OpenAI');
     if (data.GEMINI_API_KEY) activeProviders.push('Gemini');
     if (data.ANTHROPIC_API_KEY) activeProviders.push('Anthropic');
+    if (data.PADDLE_API_KEY) activeProviders.push('Paddle');
     if (data.STRIPE_SECRET_KEY) activeProviders.push('Stripe');
     if (data.RAZORPAY_KEY_ID) activeProviders.push('Razorpay');
     if (data.PAYPAL_CLIENT_ID) activeProviders.push('PayPal');

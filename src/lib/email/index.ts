@@ -10,6 +10,10 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey || apiKey.trim() === '' || apiKey.includes('your-resend-key')) {
+    if (process.env.NODE_ENV === 'production') {
+      log.error({ to: params.to, subject: params.subject }, 'RESEND_API_KEY is missing or invalid in production');
+      throw new Error('RESEND_API_KEY is not configured in production.');
+    }
     log.warn({ to: params.to, subject: params.subject }, 'RESEND_API_KEY is not configured. Email notification skipped.');
     return false;
   }

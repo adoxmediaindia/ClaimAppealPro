@@ -13,8 +13,10 @@ export class OpenAiProvider implements AiProvider {
     const apiKey = process.env.OPENAI_API_KEY;
     return (
       process.env.NODE_ENV === 'test' ||
-      apiKey === 'sk-proj-your-openai-key' ||
-      (apiKey !== undefined && apiKey.includes('mock'))
+      (process.env.NODE_ENV !== 'production' && (
+        apiKey === 'sk-proj-your-openai-key' ||
+        (apiKey !== undefined && apiKey.includes('mock'))
+      ))
     );
   }
 

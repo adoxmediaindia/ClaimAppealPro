@@ -19,10 +19,16 @@ export async function POST(req: NextRequest) {
     const rawBody = await req.text();
     const provider = getBillingProvider();
     
-    // Paddle webhook secret is read from env
-    const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET || 'mock-paddle-webhook-secret';
+    // Validate secret configurations for production context
+    const isProd = process.env.NODE_ENV === 'production';
+    const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET;
+    if (isProd && (!webhookSecret || webhookSecret.trim() === '' || webhookSecret === 'mock-paddle-webhook-secret')) {
+      log.error({ correlationId }, 'PADDLE_WEBHOOK_SECRET is not configured in production.');
+      return NextResponse.json({ error: 'Webhook configuration error' }, { status: 500 });
+    }
+    const secret = webhookSecret || 'mock-paddle-webhook-secret';
     
-    const event = await provider.constructWebhookEvent(rawBody, signature, webhookSecret);
+    const event = await provider.constructWebhookEvent(rawBody, signature, secret);
     log.info({ correlationId, eventType: event.type }, 'Paddle webhook verified and mapped successfully');
 
     switch (event.type) {
@@ -31,6 +37,20 @@ export async function POST(req: NextRequest) {
         if (!userId) {
           log.error({ correlationId }, 'Paddle checkout event missing userId metadata');
           return NextResponse.json({ error: 'Missing userId metadata' }, { status: 400 });
+        }
+
+        const targetPaddleSessionId = `checkout_${event.subscriptionId || crypto.randomUUID()}`;
+
+        // Idempotency check: prevent duplicate payments creation
+        if (event.subscriptionId) {
+          const existingPayment = await prisma.payment.findUnique({
+            where: { paddleSessionId: targetPaddleSessionId },
+          });
+
+          if (existingPayment) {
+            log.info({ correlationId, targetPaddleSessionId }, 'Paddle checkout duplicate detected, skipping creation');
+            return NextResponse.json({ received: true, duplicate: true });
+          }
         }
 
         // Upsert User Subscription details using Paddle fields
@@ -59,7 +79,7 @@ export async function POST(req: NextRequest) {
         await prisma.payment.create({
           data: {
             userId,
-            paddleSessionId: `checkout_${event.subscriptionId || crypto.randomUUID()}`,
+            paddleSessionId: targetPaddleSessionId,
             amount: event.amount || 4900, // $49.00 default in cents
             currency: event.currency || 'usd',
             status: 'completed',
@@ -103,10 +123,22 @@ export async function POST(req: NextRequest) {
         });
 
         if (subscription) {
+          const paymentSessionId = `invoice_${event.transactionId || event.subscriptionId || crypto.randomUUID()}`;
+
+          // Idempotency check: prevent duplicate payments creation
+          const existingPayment = await prisma.payment.findUnique({
+            where: { paddleSessionId: paymentSessionId },
+          });
+
+          if (existingPayment) {
+            log.info({ correlationId, paymentSessionId }, 'Paddle invoice duplicate detected, skipping creation');
+            return NextResponse.json({ received: true, duplicate: true });
+          }
+
           await prisma.payment.create({
             data: {
               userId: subscription.userId,
-              paddleSessionId: `invoice_${event.subscriptionId || crypto.randomUUID()}_${Date.now()}`,
+              paddleSessionId: paymentSessionId,
               amount: event.amount || 4900,
               currency: event.currency || 'usd',
               status: 'completed',

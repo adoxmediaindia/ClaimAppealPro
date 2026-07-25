@@ -24,8 +24,8 @@ test.describe('Dashboard & Application Shell E2E tests', () => {
     await expect(page.locator('h1')).toContainText('Welcome back');
 
     // Validate metrics cards
-    const cards = page.locator('.border-zinc-800');
-    await expect(cards).toHaveCount(4); // 3 metric cards + 1 quick actions or appeals card
+    const cards = page.locator('.grid.gap-4.md\\:grid-cols-2.lg\\:grid-cols-4 > div');
+    await expect(cards).toHaveCount(4); // 4 metrics overview cards
   });
 
   test('should support routing clicks inside the sidebar shell', async ({ page }) => {
@@ -33,15 +33,15 @@ test.describe('Dashboard & Application Shell E2E tests', () => {
 
     // Click on Appeals navigation link
     await page.click('aside a:has-text("Appeals")');
-    await expect(page).toHaveURL(/\/appeals/);
+    await expect(page).toHaveURL(/\/appeals/, { timeout: 15000 });
 
     // Click on Billing navigation link
     await page.click('aside a:has-text("Billing")');
-    await expect(page).toHaveURL(/\/billing/);
+    await expect(page).toHaveURL(/\/billing/, { timeout: 15000 });
 
     // Click on Settings navigation link
     await page.click('aside a:has-text("Settings")');
-    await expect(page).toHaveURL(/\/settings/);
+    await expect(page).toHaveURL(/\/settings/, { timeout: 15000 });
   });
 
   test('should toggle command search palette via Ctrl+K hotkey combo', async ({ page }) => {

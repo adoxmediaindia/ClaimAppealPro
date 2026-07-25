@@ -13,8 +13,10 @@ export class GeminiAiProvider implements AiProvider {
     const apiKey = process.env.GEMINI_API_KEY;
     return (
       process.env.NODE_ENV === 'test' ||
-      apiKey === 'mock-gemini-key' ||
-      (apiKey !== undefined && (apiKey.includes('mock') || apiKey.includes('your-key')))
+      (process.env.NODE_ENV !== 'production' && (
+        apiKey === 'mock-gemini-key' ||
+        (apiKey !== undefined && (apiKey.includes('mock') || apiKey.includes('your-key')))
+      ))
     );
   }
 
