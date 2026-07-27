@@ -30,24 +30,24 @@ export class OcrNormalizer {
     const confidence = rawResult.confidenceScore;
 
     // 1. Regular expression extractions
-    const patientName = this.extractField(cleanText, /(?:Patient Name|Patient|Patient's Name):\s*([A-Za-z\s]+?)(?:\r?\n|Claim|Member|Date|$)/i, 'Unknown Patient', confidence);
-    const insuranceCompany = this.extractField(cleanText, /(?:Insurance Company|Insurance|Payor):\s*([A-Za-z0-9\s]+?)(?:\r?\n|Patient|Claim|$)/i, this.inferInsurance(cleanText), confidence);
-    const claimNumber = this.extractField(cleanText, /(?:Claim (?:Number|No\.?|ID|#)):\s*([A-Za-z0-9-]+)/i, 'N/A', confidence);
-    const memberId = this.extractField(cleanText, /(?:Member (?:ID|Number|No\.?|#)):\s*([A-Za-z0-9-]+)/i, 'N/A', confidence);
-    const policyNumber = this.extractField(cleanText, /(?:Policy (?:ID|Number|No\.?|#)):\s*([A-Za-z0-9-]+)/i, 'N/A', confidence);
+    const patientName = this.extractField(cleanText, /(?:Patient Name|Patient's Name|Patient):\s*(.*?)(?:\s{2,}|\r?\n|Member|Claim|Date|Provider|$)/i, 'Unknown Patient', confidence);
+    const insuranceCompany = this.extractField(cleanText, /(?:Insurance Company|Insurance|Payor):\s*(.*?)(?:\s{2,}|\r?\n|Patient|Claim|Member|Provider|$)/i, this.inferInsurance(cleanText), confidence);
+    const claimNumber = this.extractField(cleanText, /(?:Claim (?:Number|No\.?|ID|#)):\s*(.*?)(?:\s{2,}|\r?\n|Date|Member|Provider|$)/i, 'N/A', confidence);
+    const memberId = this.extractField(cleanText, /(?:Member (?:ID|Number|No\.?|#)):\s*(.*?)(?:\s{2,}|\r?\n|Claim|Date|Provider|$)/i, 'N/A', confidence);
+    const policyNumber = this.extractField(cleanText, /(?:Policy (?:ID|Number|No\.?|#)):\s*(.*?)(?:\s{2,}|\r?\n|Claim|Date|Provider|$)/i, 'N/A', confidence);
     
     // Service and Denial Date normalization
-    const dateOfService = this.extractDateField(cleanText, /(?:Date of Service|Service Date|DOS):\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i, confidence);
-    const denialDate = this.extractDateField(cleanText, /(?:Denial Date|Date of Denial|Date of Letter|Date):\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i, confidence);
+    const dateOfService = this.extractDateField(cleanText, /(?:Date of Service|Service Date|DOS):\s*(.*?)(?:\s{2,}|\r?\n|Insurance|Provider|Procedure|$)/i, confidence);
+    const denialDate = this.extractDateField(cleanText, /(?:Denial Date|Date of Denial|Date of Letter|Date):\s*(.*?)(?:\s{2,}|\r?\n|Patient|Claim|Member|Provider|$)/i, confidence);
     
-    const providerName = this.extractField(cleanText, /(?:Provider Name|Provider|Physician|Doctor|Facility):\s*([A-Za-z\s]+?)(?:\r?\n|NPI|Claim|$)/i, 'Unknown Provider', confidence);
+    const providerName = this.extractField(cleanText, /(?:Provider Name|Provider|Physician|Doctor|Facility):\s*(.*?)(?:\s{2,}|\r?\n|Procedure|Claim|$)/i, 'Unknown Provider', confidence);
     
-    // CPT/ICD code extraction
-    const cptCodes = this.extractCodes(cleanText, /\b\d{5}\b/g, confidence);
+    // CPT/ICD code extraction (use lookbehind to exclude claim numbers, zip codes, dates, phone numbers, dollar amounts)
+    const cptCodes = this.extractCodes(cleanText, /(?<![-#\w\.\/\$])\b\d{5}\b/g, confidence);
     const icdCodes = this.extractCodes(cleanText, /\b[A-Z]\d{2}(?:\.\d{1,4})?\b/gi, confidence);
     
     const denialReason = this.extractField(cleanText, /(?:Reason for Denial|Denial Reason|Reason):\s*([^\n\r]+)/i, this.inferDenialReason(cleanText), confidence);
-    const appealDeadline = this.extractDateField(cleanText, /(?:Appeal Deadline|Deadline|Must be submitted by):\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i, confidence);
+    const appealDeadline = this.extractDateField(cleanText, /(?:Appeal Deadline|Deadline|Must be submitted by):\s*(.*?)(?:\s{2,}|\r?\n|Patient|Claim|Member|Provider|$)/i, confidence);
     
     const contactInformation = this.extractField(cleanText, /(?:Contact Info|Contact Number|Phone|Telephone):\s*([\d\s()-]+)/i, 'N/A', confidence);
     const address = this.extractField(cleanText, /(?:Mailing Address|Address):\s*([^\n]+)/i, 'N/A', confidence);

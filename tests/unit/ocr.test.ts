@@ -139,6 +139,43 @@ describe('OCR & Document Intelligence Engine Tests', () => {
       const result = normalizer.normalize(mockRaw);
       expect(result.insuranceCompany.value).toBe('Aetna');
     });
+
+    it('should parse the exact regression test denial document structure successfully', () => {
+      const rawText = `
+Patient Name: John Test
+Member ID: TEST-458921
+Claim Number: CLM-2026-10001
+Date of Service: July 10, 2026
+Insurance Company: Sample Health Insurance
+Provider: Demo Medical Center
+Procedure: MRI of Lumbar Spine
+Procedure Code: 72148
+Claim Amount: $1,250.00
+
+Denial reason:
+The claim was denied because the submitted documentation does not demonstrate that the requested service meets medical necessity requirements under the current health plan guidelines.
+`;
+
+      const mockRaw = {
+        rawOcrText: rawText,
+        confidenceScore: 0.95,
+        provider: 'mistral' as const,
+        processingTimeMs: 150,
+      };
+
+      const result = normalizer.normalize(mockRaw);
+
+      expect(result.patientName.value).toBe('John Test');
+      expect(result.memberId.value).toBe('TEST-458921');
+      expect(result.claimNumber.value).toBe('CLM-2026-10001');
+      expect(result.dateOfService.value).toBe('2026-07-10');
+      expect(result.insuranceCompany.value).toBe('Sample Health Insurance');
+      expect(result.providerName.value).toBe('Demo Medical Center');
+      expect(result.cptCodes.value).toEqual(['72148']); // CLM-2026-10001's 10001 is NOT CPT
+      expect(result.denialReason.value).toContain('medical necessity requirements');
+      expect(result.denialDate.value).toBe('N/A');
+      expect(result.policyNumber.value).toBe('N/A');
+    });
   });
 
   describe('OcrValidator Warnings Alerts', () => {
