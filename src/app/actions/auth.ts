@@ -18,6 +18,13 @@ export interface ActionResponse<T> {
   };
 }
 
+function normalizePhone(phone: string): string {
+  const cleaned = phone.trim();
+  const hasPlus = cleaned.startsWith('+');
+  const digits = cleaned.replace(/\D/g, '');
+  return hasPlus ? `+${digits}` : digits;
+}
+
 /**
  * Registers a new user account with Supabase Auth and creates corresponding DB records.
  */
@@ -35,7 +42,12 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
       throw new ValidationError('Validation failed for registration input.', fieldErrors);
     }
 
-    const { email, password, firstName, lastName, clinicName, npiNumber } = result.data;
+    const { email, password, fullName, phone, clinicName } = result.data;
+    const nameParts = fullName.trim().split(/\s+/);
+    const firstName = nameParts.slice(0, -1).join(' ') || nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+    const normalizedPhone = normalizePhone(phone);
+
     const supabase = await createServerSideClient();
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -45,6 +57,7 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         data: {
           firstName,
           lastName,
+          phone: normalizedPhone,
           role: 'USER',
         },
       },
@@ -79,15 +92,15 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
           update: {
             firstName,
             lastName,
+            phone: normalizedPhone,
             clinicName: clinicName || null,
-            npiNumber: npiNumber || null,
           },
           create: {
             userId: publicUser.id,
             firstName,
             lastName,
+            phone: normalizedPhone,
             clinicName: clinicName || null,
-            npiNumber: npiNumber || null,
           },
         });
       });
@@ -192,11 +205,15 @@ export async function loginUser(input: LoginInput): Promise<ActionResponse<{ ema
               role: 'USER',
             },
           });
+          const userMetadata = supabaseUser.user_metadata || {};
+          const metaFirstName = userMetadata.given_name || userMetadata.firstName || null;
+          const metaLastName = userMetadata.family_name || userMetadata.lastName || null;
+
           await tx.profile.create({
             data: {
               userId: publicUser.id,
-              firstName: 'Valued',
-              lastName: 'Provider',
+              firstName: metaFirstName,
+              lastName: metaLastName,
             },
           });
           return publicUser;
@@ -312,7 +329,7 @@ export async function requestPasswordReset(input: ForgotPasswordInput): Promise<
     const supabase = await createServerSideClient();
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${config.APP_URL}/auth/callback?next=/reset-password`,
+      redirectTo: `${config.APP_URL}/api/v1/auth/callback?next=/reset-password`,
     });
 
     if (resetError) {

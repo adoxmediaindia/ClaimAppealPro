@@ -56,8 +56,11 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  const firstName = userData?.profile?.firstName || 'Valued';
-  const lastName = userData?.profile?.lastName || 'Provider';
+  const profile = userData?.profile;
+  const displayName = profile
+    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || user.email || 'User'
+    : user.email || 'User';
+
   const totalAppeals = userData?._count?.appeals || 0;
   const planTier = userData?.subscription?.planId ? userData.subscription.planId.toUpperCase() : 'FREE TRIAL';
   const subscriptionStatus = userData?.subscription?.status || 'Active';
@@ -75,7 +78,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Welcome back, Dr. {firstName} {lastName}
+            Welcome back, {displayName}
           </h1>
           <p className="text-xs text-zinc-400 mt-1">
             Generate, customize, and export insurance denial appeal letters.

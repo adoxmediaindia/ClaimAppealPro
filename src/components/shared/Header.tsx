@@ -12,6 +12,7 @@ interface HeaderProps {
   onOpenMobileSidebar: () => void;
   onOpenCommandPalette: () => void;
   userEmail?: string;
+  userName?: string;
   usageCount?: number;
   usageLimit?: number;
   initialNotifications?: any[];
@@ -21,6 +22,7 @@ export default function Header({
   onOpenMobileSidebar,
   onOpenCommandPalette,
   userEmail = 'user@example.com',
+  userName = '',
   usageCount = 0,
   usageLimit = 5,
   initialNotifications = [],
@@ -197,9 +199,9 @@ export default function Header({
             className="flex items-center space-x-2 rounded-full border border-white/[0.08] bg-[#101216] p-1 pl-2 text-left hover:border-white/[0.15] transition-all"
           >
             <div className="flex h-5.5 w-5.5 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-200">
-              {userEmail.charAt(0).toUpperCase()}
+              {(userName || userEmail).charAt(0).toUpperCase()}
             </div>
-            <span className="hidden sm:inline text-[10px] font-semibold text-zinc-300 pr-1">{userEmail}</span>
+            <span className="hidden sm:inline text-[10px] font-semibold text-zinc-300 pr-1">{userName || userEmail}</span>
             <ChevronDown className="h-3 w-3 text-zinc-550" />
           </button>
 

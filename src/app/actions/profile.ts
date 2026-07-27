@@ -7,6 +7,13 @@ import { ValidationError, ApiError, DatabaseError, UnauthorizedError } from '@/l
 import { profileSchema, type ProfileInput } from '@/lib/validations/profile';
 import { type ActionResponse } from './auth';
 
+function normalizePhone(phone: string): string {
+  const cleaned = phone.trim();
+  const hasPlus = cleaned.startsWith('+');
+  const digits = cleaned.replace(/\D/g, '');
+  return hasPlus ? `+${digits}` : digits;
+}
+
 /**
  * Updates the profile of the authenticated user.
  */
@@ -24,13 +31,15 @@ export async function updateProfileAction(input: ProfileInput): Promise<ActionRe
       throw new ValidationError('Validation failed for profile inputs.', fieldErrors);
     }
 
-    const { firstName, lastName, clinicName, npiNumber } = result.data;
+    const { firstName, lastName, clinicName, npiNumber, phone } = result.data;
     const supabase = await createServerSideClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       throw new UnauthorizedError('Authentication required. Session expired.');
     }
+
+    const normalizedPhone = phone ? normalizePhone(phone) : null;
 
     // Update public user profile and record in prisma
     try {
@@ -39,6 +48,7 @@ export async function updateProfileAction(input: ProfileInput): Promise<ActionRe
         update: {
           firstName,
           lastName,
+          phone: normalizedPhone,
           clinicName: clinicName || null,
           npiNumber: npiNumber || null,
         },
@@ -46,6 +56,7 @@ export async function updateProfileAction(input: ProfileInput): Promise<ActionRe
           userId: user.id,
           firstName,
           lastName,
+          phone: normalizedPhone,
           clinicName: clinicName || null,
           npiNumber: npiNumber || null,
         },

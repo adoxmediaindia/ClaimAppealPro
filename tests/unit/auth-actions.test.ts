@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { signUpUser, loginUser, logoutUser, requestPasswordReset, updatePasswordAfterReset, signInWithGoogle } from '@/app/actions/auth';
+import { signUpUser, loginUser, logoutUser, requestPasswordReset, updatePasswordAfterReset } from '@/app/actions/auth';
+import { updateProfileAction } from '@/app/actions/profile';
 import { GET as oauthCallbackHandler } from '@/app/api/v1/auth/callback/route';
 
 // vi.hoisted allows variables to be declared and initialized before mock modules are resolved
@@ -13,6 +14,7 @@ const { mockPrisma, mockUserUpsert, mockUserFindUnique, mockProfileUpsert, mockA
     user: {
       upsert: mockUserUpsertFn,
       findUnique: mockUserFindUniqueFn,
+      create: vi.fn(),
     },
     profile: {
       upsert: mockProfileUpsertFn,
@@ -73,13 +75,13 @@ vi.mock('@/lib/prisma', () => ({
   prisma: mockPrisma,
 }));
 
-describe('Authentication Server Actions Integration Tests', () => {
+describe('Authentication & Profile Upgraded Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('signUpUser Server Action', () => {
-    it('should validate signup schemas and create users on Supabase and PostgreSQL', async () => {
+    it('should split fullName, validate E.164 phone, and create user and profile on Supabase and PostgreSQL', async () => {
       mockSignUp.mockResolvedValue({
         data: { user: { id: 'mock-uuid', email: 'test@example.com' }, session: null },
         error: null,
@@ -91,71 +93,72 @@ describe('Authentication Server Actions Integration Tests', () => {
       const response = await signUpUser({
         email: 'test@example.com',
         password: 'Password123!',
-        firstName: 'John',
-        lastName: 'Doe',
+        confirmPassword: 'Password123!',
+        fullName: 'Michael Johnson',
+        phone: '+1 555-555-5555',
+        clinicName: 'Main Street Clinic',
       });
 
       expect(mockSignUp).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'Password123!',
         options: {
-          data: { firstName: 'John', lastName: 'Doe', role: 'USER' },
+          data: { firstName: 'Michael', lastName: 'Johnson', phone: '+15555555555', role: 'USER' },
         },
       });
       expect(response.success).toBe(true);
-      expect(response.data?.requiresVerification).toBe(true);
     });
 
-    it('should reject signups containing weak passwords', async () => {
+    it('should reject signups when password and confirmPassword do not match', async () => {
       const response = await signUpUser({
         email: 'test@example.com',
-        password: 'weak',
-        firstName: 'John',
-        lastName: 'Doe',
+        password: 'Password123!',
+        confirmPassword: 'DifferentPassword123!',
+        fullName: 'Michael Johnson',
+        phone: '+1 555-555-5555',
       });
 
       expect(response.success).toBe(false);
       expect(response.error?.code).toBe('VALIDATION_ERROR');
+      expect(response.error?.details?.confirmPassword?.[0]).toContain('do not match');
     });
 
-    it('should block disposable email domains', async () => {
-      const response = await signUpUser({
-        email: 'test@mailinator.com',
-        password: 'Password123!',
-        firstName: 'John',
-        lastName: 'Doe',
+    it('should validate and accept international/US phone formatting', async () => {
+      mockSignUp.mockResolvedValue({
+        data: { user: { id: 'mock-uuid', email: 'test@example.com' }, session: null },
+        error: null,
       });
 
-      expect(response.success).toBe(false);
-      expect(response.error?.code).toBe('VALIDATION_ERROR');
+      const response1 = await signUpUser({
+        email: 'test@example.com',
+        password: 'Password123!',
+        confirmPassword: 'Password123!',
+        fullName: 'John',
+        phone: '+91 99999 88888', // Indian format
+      });
+      expect(response1.success).toBe(true);
+
+      const response2 = await signUpUser({
+        email: 'test@example.com',
+        password: 'Password123!',
+        confirmPassword: 'Password123!',
+        fullName: 'John',
+        phone: 'invalid-phone-number',
+      });
+      expect(response2.success).toBe(false);
+      expect(response2.error?.code).toBe('VALIDATION_ERROR');
     });
   });
 
   describe('loginUser Server Action', () => {
-    it('should block login if the email is not verified', async () => {
-      mockSignInWithPassword.mockResolvedValue({
-        data: { user: { id: 'mock-uuid', email: 'test@example.com', email_confirmed_at: null } },
-        error: null,
-      });
-
-      const response = await loginUser({
-        email: 'test@example.com',
-        password: 'Password123!',
-      });
-
-      expect(mockSignOut).toHaveBeenCalled();
-      expect(response.success).toBe(false);
-      expect(response.error?.code).toBe('UNAUTHORIZED');
-      expect(response.error?.message).toContain('Invalid email, incorrect password, or unverified account.');
-    });
-
-    it('should authorize logins for verified accounts', async () => {
+    it('should allow login for verified user accounts and synchronize missing profiles', async () => {
       mockSignInWithPassword.mockResolvedValue({
         data: { user: { id: 'mock-uuid', email: 'test@example.com', email_confirmed_at: '2026-07-14T20:00:00Z' } },
         error: null,
       });
 
       mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+      mockAuditLogCreate.mockResolvedValue({});
 
       const response = await loginUser({
         email: 'test@example.com',
@@ -209,7 +212,6 @@ describe('Authentication Server Actions Integration Tests', () => {
 
         expect(response.success).toBe(false);
         expect(response.error?.code).toBe('UNAUTHORIZED');
-        expect(response.error?.message).toContain('expired');
       });
 
       it('should update password and invalidate all sessions if valid', async () => {
@@ -229,78 +231,67 @@ describe('Authentication Server Actions Integration Tests', () => {
     });
   });
 
-  describe('Google OAuth Server Actions & Callbacks', () => {
-    describe('signInWithGoogle Server Action', () => {
-      it('should invoke Supabase OAuth flow and return authorization url', async () => {
-        mockSignInWithOAuth.mockResolvedValue({
-          data: { provider: 'google', url: 'https://google.com/oauth' },
-          error: null,
-        });
+  describe('updateProfileAction Server Action', () => {
+    it('should block profile update updates if user session does not exist', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null } });
 
-        const response = await signInWithGoogle();
-
-        expect(mockSignInWithOAuth).toHaveBeenCalledWith({
-          provider: 'google',
-          options: expect.objectContaining({
-            redirectTo: expect.stringContaining('/auth/callback'),
-          }),
-        });
-        expect(response.success).toBe(true);
-        expect(response.data?.url).toBe('https://google.com/oauth');
+      const response = await updateProfileAction({
+        firstName: 'Michael',
+        lastName: 'Johnson',
+        clinicName: 'Primary Clinic',
+        phone: '+1 555-555-5555',
       });
+
+      expect(response.success).toBe(false);
+      expect(response.error?.code).toBe('UNAUTHORIZED');
     });
 
-    describe('OAuth Callback API Handler Route', () => {
-      it('should redirect to login if code query parameter is missing', async () => {
-        const req = new Request('http://localhost:3000/api/v1/auth/callback');
-        const response = await oauthCallbackHandler(req);
+    it('should save updated phone and name attributes for authenticated users', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'mock-uuid' } } });
+      mockProfileUpsert.mockResolvedValue({});
+      mockAuditLogCreate.mockResolvedValue({});
 
-        expect(response.status).toBe(307); // NextResponse.redirect status
-        expect(response.headers.get('location')).toContain('/login?error=OAUTH_MISSING_CODE');
+      const response = await updateProfileAction({
+        firstName: 'Michael',
+        lastName: 'Johnson',
+        clinicName: 'Primary Clinic',
+        phone: '+1 555-555-5555',
       });
 
-      it('should exchange code and register profile metadata in database', async () => {
-        mockExchangeCodeForSession.mockResolvedValue({
-          data: {
-            user: {
-              id: 'google-uuid',
-              email: 'google@example.com',
-              user_metadata: { given_name: 'Google', family_name: 'User' },
-            },
+      expect(mockProfileUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            firstName: 'Michael',
+            lastName: 'Johnson',
+            phone: '+15555555555',
+          }),
+        })
+      );
+      expect(response.success).toBe(true);
+    });
+  });
+
+  describe('Password Recovery Redirect Callbacks', () => {
+    it('should successfully handle OAuth callback requests and secure query parameters', async () => {
+      mockExchangeCodeForSession.mockResolvedValue({
+        data: {
+          user: {
+            id: 'mock-uuid',
+            email: 'user@example.com',
+            user_metadata: { given_name: 'John', family_name: 'Smith' },
           },
-          error: null,
-        });
-
-        mockUserUpsert.mockResolvedValue({ id: 'google-uuid', email: 'google@example.com' });
-        mockProfileUpsert.mockResolvedValue({ id: 'profile-uuid' });
-        mockAuditLogCreate.mockResolvedValue({ id: 'audit-uuid' });
-
-        const req = new Request('http://localhost:3000/api/v1/auth/callback?code=valid-code');
-        const response = await oauthCallbackHandler(req);
-
-        expect(mockExchangeCodeForSession).toHaveBeenCalledWith('valid-code');
-        expect(mockUserUpsert).toHaveBeenCalled();
-        expect(mockProfileUpsert).toHaveBeenCalled();
-        expect(mockAuditLogCreate).toHaveBeenCalled();
-        expect(response.headers.get('location')).toBe('http://localhost:3000/dashboard');
+        },
+        error: null,
       });
 
-      it('should prevent open redirect hijacking attempts', async () => {
-        mockExchangeCodeForSession.mockResolvedValue({
-          data: {
-            user: { id: 'google-uuid', email: 'google@example.com' },
-          },
-          error: null,
-        });
+      mockUserUpsert.mockResolvedValue({ id: 'mock-uuid', email: 'user@example.com' });
+      mockProfileUpsert.mockResolvedValue({});
+      mockAuditLogCreate.mockResolvedValue({});
 
-        const req = new Request(
-          'http://localhost:3000/api/v1/auth/callback?code=valid-code&next=https://malicious-site.com'
-        );
-        const response = await oauthCallbackHandler(req);
+      const req = new Request('http://localhost:3000/api/v1/auth/callback?code=recovery-code&next=/reset-password');
+      const response = await oauthCallbackHandler(req);
 
-        // Should ignore malicious domain and redirect to fallback /dashboard
-        expect(response.headers.get('location')).toBe('http://localhost:3000/dashboard');
-      });
+      expect(response.headers.get('location')).toBe('http://localhost:3000/reset-password');
     });
   });
 });

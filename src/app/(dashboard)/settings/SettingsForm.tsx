@@ -12,6 +12,7 @@ interface SettingsFormProps {
     firstName: string;
     lastName: string;
     clinicName: string;
+    phone: string;
     npiNumber: string;
   };
 }
@@ -161,6 +162,25 @@ export default function SettingsForm({ initialProfile }: SettingsFormProps) {
                 />
                 {validationErrors.clinicName && (
                   <p className="text-[10px] text-rose-455 mt-1">{validationErrors.clinicName}</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="phone" className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider">Phone Number</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="+1 555-555-5555"
+                  value={profile.phone}
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2 text-xs rounded border bg-[#08090B] text-zinc-100 placeholder-zinc-650 focus:outline-none focus:border-[#4F8CFF]/50 focus:ring-1 focus:ring-[#4F8CFF]/30 transition-all ${
+                    validationErrors.phone ? 'border-rose-900 focus:border-rose-800 focus:ring-rose-900/30' : 'border-white/[0.08]'
+                  }`}
+                  disabled={isPending}
+                />
+                {validationErrors.phone && (
+                  <p className="text-[10px] text-rose-455 mt-1">{validationErrors.phone}</p>
                 )}
               </div>
 

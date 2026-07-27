@@ -8,30 +8,33 @@ export const passwordSchema = z
   .regex(/[0-9]/, { message: 'Password must contain at least one number.' })
   .regex(/[^a-zA-Z0-9]/, { message: 'Password must contain at least one special character.' });
 
-export const signUpSchema = z.object({
-  email: z
-    .string()
-    .email({ message: 'Must be a valid email address.' })
-    .refine(
-      (val) => {
-        const domain = val.split('@')[1]?.toLowerCase();
-        const blockedDomains = ['mailinator.com', '10minutemail.com', 'tempmail.com', 'yopmail.com', 'trashmail.com'];
-        return !blockedDomains.includes(domain);
-      },
-      { message: 'Disposable email addresses are not permitted.' }
-    ),
-  password: passwordSchema,
-
-  firstName: z.string().min(1, { message: 'First name is required.' }).max(50),
-  lastName: z.string().min(1, { message: 'Last name is required.' }).max(50),
-  clinicName: z.string().max(100).optional(),
-  npiNumber: z
-    .string()
-    .length(10, { message: 'NPI number must be exactly 10 digits.' })
-    .regex(/^\d+$/, { message: 'NPI number must contain digits only.' })
-    .optional()
-    .or(z.literal('')),
-});
+export const signUpSchema = z
+  .object({
+    email: z
+      .string()
+      .email({ message: 'Must be a valid email address.' })
+      .refine(
+        (val) => {
+          const domain = val.split('@')[1]?.toLowerCase();
+          const blockedDomains = ['mailinator.com', '10minutemail.com', 'tempmail.com', 'yopmail.com', 'trashmail.com'];
+          return !blockedDomains.includes(domain);
+        },
+        { message: 'Disposable email addresses are not permitted.' }
+      ),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, { message: 'Confirm password is required.' }),
+    fullName: z.string().trim().min(1, { message: 'Full name is required.' }).max(100),
+    phone: z
+      .string()
+      .trim()
+      .min(1, { message: 'Phone number is required.' })
+      .regex(/^\+?[0-9\s\-()]{7,25}$/, { message: 'Must be a valid phone number.' }),
+    clinicName: z.string().max(100).optional().or(z.literal('')),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match.',
+    path: ['confirmPassword'],
+  });
 
 export const loginSchema = z.object({
   email: z.string().email({ message: 'Must be a valid email address.' }),

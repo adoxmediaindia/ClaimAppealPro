@@ -7,19 +7,21 @@ import CommandPalette from '@/components/shared/CommandPalette';
 
 interface AppShellClientProps {
   children: React.ReactNode;
-  userEmail: string;
-  userRole: string;
-  usageCount: number;
-  usageLimit: number;
+  userEmail?: string;
+  userName?: string;
+  userRole?: string;
+  usageCount?: number;
+  usageLimit?: number;
   initialNotifications?: any[];
 }
 
 export default function AppShellClient({
   children,
-  userEmail,
-  userRole,
-  usageCount,
-  usageLimit,
+  userEmail = 'user@example.com',
+  userName = '',
+  userRole = 'USER',
+  usageCount = 0,
+  usageLimit = 5,
   initialNotifications = [],
 }: AppShellClientProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -55,6 +57,7 @@ export default function AppShellClient({
           onOpenMobileSidebar={() => setSidebarOpen(true)}
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           userEmail={userEmail}
+          userName={userName}
           usageCount={usageCount}
           usageLimit={usageLimit}
           initialNotifications={initialNotifications}

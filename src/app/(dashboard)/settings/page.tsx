@@ -23,6 +23,7 @@ export default async function SettingsPage() {
     firstName: profile?.firstName || '',
     lastName: profile?.lastName || '',
     clinicName: profile?.clinicName || '',
+    phone: profile?.phone || '',
     npiNumber: profile?.npiNumber || '',
   };
 
