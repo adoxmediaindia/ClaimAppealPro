@@ -75,7 +75,7 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
     const planConfig = getPlanById(activePlanId);
     const activeUsageCount = dbUser?._count?.appeals || 0;
 
-    if (activeUsageCount >= planConfig.limit) {
+    if (activeUsageCount > planConfig.limit) {
       throw new ApiError(402, 'QUOTA_EXCEEDED', `Billing quota exceeded: your plan limit is ${planConfig.limit} appeal letters.`);
     }
 

@@ -71,7 +71,7 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
     const planConfig = getPlanById(activePlanId);
     const activeUsageCount = dbUser?._count?.appeals || 0;
 
-    if (activeUsageCount >= planConfig.limit) {
+    if (activeUsageCount > planConfig.limit) {
       throw new ApiError(402, 'QUOTA_EXCEEDED', `Billing quota exceeded: your plan limit is ${planConfig.limit} appeal letters.`);
     }
 
@@ -102,6 +102,22 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
     // 3. Fetch binary buffer from Storage bucket
     const storage = new SupabaseStorageProvider();
     const fileBuffer = await storage.downloadFile(fileRecord.storagePath);
+
+    // Verify PDF header structure safely
+    let validPdfHeader = false;
+    if (fileRecord.mimeType === 'application/pdf') {
+      validPdfHeader = fileBuffer.length >= 4 && fileBuffer.toString('utf-8', 0, 4) === '%PDF';
+      log.info({
+        correlationId,
+        mimeType: fileRecord.mimeType,
+        byteLength: fileBuffer.length,
+        validPdfHeader,
+      }, 'PDF header signature validation check completed');
+      
+      if (!validPdfHeader) {
+        throw new ApiError(400, 'INVALID_PDF_HEADER', 'The uploaded document does not have a valid PDF header signature.');
+      }
+    }
 
     // 4. Initiate OCR processing pipeline (Native PDF parse -> Mistral primary -> Tesseract fallback)
     let ocrResult: OcrResult | null = null;
@@ -135,6 +151,15 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
       try {
         ocrResult = await mistral.extract(fileBuffer, fileRecord.mimeType);
       } catch (err: any) {
+        const isVercel = process.env.VERCEL === '1';
+        if (isVercel) {
+          log.error(
+            { correlationId, errorMsg: err.message },
+            'Primary Mistral OCR failed. Local Tesseract fallback is disabled on Vercel runtime to prevent serverless worker crashes.'
+          );
+          throw new ApiError(500, 'OCR_PROVIDER_FAILED', `Document analysis failed: ${err.message}. Please configure MISTRAL_API_KEY environment variable on Vercel.`);
+        }
+
         log.warn(
           { correlationId, errorMsg: err.message },
           'Primary Mistral OCR failed. Activating local Tesseract fallback engine'

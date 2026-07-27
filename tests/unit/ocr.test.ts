@@ -192,7 +192,7 @@ describe('OCR & Document Intelligence Engine Tests', () => {
           },
         });
 
-        hoisted.mockDownloadFile.mockResolvedValue(Buffer.from('mock file content'));
+        hoisted.mockDownloadFile.mockResolvedValue(Buffer.from('%PDF-1.4 mock file content'));
 
         // 1. Simulate Mistral API connection failure
         hoisted.mockMistralExtract.mockRejectedValue(new Error('Mistral connection timeout'));
@@ -268,7 +268,7 @@ describe('OCR & Document Intelligence Engine Tests', () => {
             userId: 'user-uuid',
           },
         });
-        hoisted.mockDownloadFile.mockResolvedValue(Buffer.from('mock file content'));
+        hoisted.mockDownloadFile.mockResolvedValue(Buffer.from('%PDF-1.4 mock file content'));
         hoisted.mockAppealUpdate.mockResolvedValue({ id: 'appeal-uuid' });
         hoisted.mockAuditLogCreate.mockResolvedValue({ id: 'log-uuid' });
         // Set default mocks
@@ -360,12 +360,36 @@ describe('OCR & Document Intelligence Engine Tests', () => {
         // Simulate quota exceeded
         hoisted.mockUserFindUnique.mockResolvedValueOnce({
           subscription: { planId: 'free', status: 'active' },
-          _count: { appeals: 5 } // Quota reached limit (5)
+          _count: { appeals: 6 } // Quota reached limit (5) and exceeded (6)
         });
 
         const res = await processOcrForFile('file-uuid');
         expect(res.success).toBe(false);
         expect(res.error?.code).toBe('QUOTA_EXCEEDED');
+      });
+
+      it('should reject PDFs missing %PDF header signature', async () => {
+        hoisted.mockDownloadFile.mockResolvedValueOnce(Buffer.from('invalid file header'));
+
+        const res = await processOcrForFile('file-uuid');
+
+        expect(res.success).toBe(false);
+        expect(res.error?.code).toBe('INVALID_PDF_HEADER');
+      });
+
+      it('should bypass Tesseract fallback on Vercel runtime to prevent serverless worker crashes', async () => {
+        process.env.VERCEL = '1';
+        hoisted.mockParsePdf.mockRejectedValue(new Error('Native PDF extraction failed'));
+        hoisted.mockMistralExtract.mockRejectedValue(new Error('Mistral connection timeout'));
+
+        try {
+          const res = await processOcrForFile('file-uuid');
+          expect(res.success).toBe(false);
+          expect(res.error?.code).toBe('OCR_PROVIDER_FAILED');
+          expect(hoisted.mockTesseractExtract).not.toHaveBeenCalled();
+        } finally {
+          delete process.env.VERCEL;
+        }
       });
     });
 

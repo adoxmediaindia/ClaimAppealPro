@@ -38,6 +38,9 @@ export class MistralOcrProvider implements OcrProvider {
     }
 
     const startTime = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
     try {
       // In production, we send a multipart form request containing the file buffer.
       // We construct the multipart request boundary manually or via standard fetch utilities.
@@ -58,7 +61,10 @@ export class MistralOcrProvider implements OcrProvider {
           'Authorization': `Bearer ${apiKey}`,
         },
         body: requestBody as any,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -83,7 +89,11 @@ export class MistralOcrProvider implements OcrProvider {
         processingTimeMs: Date.now() - startTime,
       };
     } catch (err: any) {
+      clearTimeout(timeoutId);
       log.error({ correlationId }, 'Mistral OCR provider extraction threw exception', err);
+      if (err.name === 'AbortError') {
+        throw new ApiError(504, 'MISTRAL_OCR_TIMEOUT', 'Mistral OCR request timed out after 25 seconds.');
+      }
       throw err;
     }
   }

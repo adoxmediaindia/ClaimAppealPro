@@ -23,13 +23,18 @@ export default function OcrProcessingView({ fileId, fileName }: OcrProcessingVie
     setErrorMessage(null);
 
     startTransition(async () => {
-      const response = await processOcrForFile(fileId);
-      if (response.success) {
-        setStatus('SUCCESS');
-        router.refresh();
-      } else {
+      try {
+        const response = await processOcrForFile(fileId);
+        if (response.success) {
+          setStatus('SUCCESS');
+          router.refresh();
+        } else {
+          setStatus('ERROR');
+          setErrorMessage(response.error?.message || 'Failed to extract claim text.');
+        }
+      } catch (err: any) {
         setStatus('ERROR');
-        setErrorMessage(response.error?.message || 'Failed to extract claim text.');
+        setErrorMessage(err?.message || 'An unexpected server error occurred during document analysis.');
       }
     });
   }, [fileId, router]);

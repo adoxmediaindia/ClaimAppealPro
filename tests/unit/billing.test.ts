@@ -309,7 +309,7 @@ describe('Billing & Subscription System Unit Tests', () => {
 
       hoisted.mockUserFindUnique.mockResolvedValue({
         subscription: { planId: 'free', status: 'active' },
-        _count: { appeals: 5 }, // 5 generated out of 5 limit
+        _count: { appeals: 6 }, // limit is 5, count is 6 (including draft)
       });
 
       const res = await processOcrForFile('file-uuid');
@@ -325,7 +325,7 @@ describe('Billing & Subscription System Unit Tests', () => {
 
       hoisted.mockUserFindUnique.mockResolvedValue({
         subscription: { planId: 'free', status: 'active' },
-        _count: { appeals: 5 },
+        _count: { appeals: 6 },
       });
 
       const res = await generateAppealAction('appeal-uuid');
