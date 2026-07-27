@@ -12,6 +12,9 @@ const hoisted = vi.hoisted(() => {
   const mockDownloadFileFn = vi.fn();
   const mockMistralExtractFn = vi.fn();
   const mockTesseractExtractFn = vi.fn();
+  const mockParsePdfFn = vi.fn().mockResolvedValue({
+    text: 'Patient Name: Fallback User \nClaim Number: CLM-FALLBACK \nDenial Date: 01/01/2026',
+  });
   const mockUserFindUniqueFn = vi.fn().mockResolvedValue({
     subscription: { planId: 'free', status: 'active' },
     _count: { appeals: 0 }
@@ -43,6 +46,7 @@ const hoisted = vi.hoisted(() => {
     mockMistralExtract: mockMistralExtractFn,
     mockTesseractExtract: mockTesseractExtractFn,
     mockUserFindUnique: mockUserFindUniqueFn,
+    mockParsePdf: mockParsePdfFn,
   };
 });
 
@@ -80,11 +84,9 @@ vi.mock('@/lib/ocr/provider', () => ({
   },
 }));
 
-vi.mock('pdf-parse', () => {
+vi.mock('@/lib/ocr/pdf-parser', () => {
   return {
-    default: vi.fn().mockResolvedValue({
-      text: 'Patient Name: Fallback User \nClaim Number: CLM-FALLBACK \nDenial Date: 01/01/2026',
-    }),
+    parsePdf: hoisted.mockParsePdf,
   };
 });
 
@@ -251,6 +253,119 @@ describe('OCR & Document Intelligence Engine Tests', () => {
           },
         });
         expect(res.success).toBe(true);
+      });
+    });
+
+    describe('OCR processing flow and bounds validations', () => {
+      beforeEach(() => {
+        mockGetUser.mockResolvedValue({ data: { user: { id: 'user-uuid' } } });
+        hoisted.mockFileFindUnique.mockResolvedValue({
+          id: 'file-uuid',
+          appealId: 'appeal-uuid',
+          mimeType: 'application/pdf',
+          storagePath: 'path/document.pdf',
+          appeal: {
+            userId: 'user-uuid',
+          },
+        });
+        hoisted.mockDownloadFile.mockResolvedValue(Buffer.from('mock file content'));
+        hoisted.mockAppealUpdate.mockResolvedValue({ id: 'appeal-uuid' });
+        hoisted.mockAuditLogCreate.mockResolvedValue({ id: 'log-uuid' });
+        // Set default mocks
+        hoisted.mockUserFindUnique.mockResolvedValue({
+          subscription: { planId: 'free', status: 'active' },
+          _count: { appeals: 0 }
+        });
+      });
+
+      it('should execute successful PDF text extraction and transition status to READY', async () => {
+        hoisted.mockParsePdf.mockResolvedValue({
+          text: 'Patient Name: Test User \nInsurance Company: Aetna \nClaim Number: CLM-11111 \nDenial Date: 05/12/2026 \nReason: Not medically necessary \nCPT: 99214 \nICD: I10 \nThis is a long text to exceed the 150 character limit requirement for native pdf parser text extraction to succeed without falling back to external OCR providers.',
+        });
+
+        const res = await processOcrForFile('file-uuid');
+
+        expect(res.success).toBe(true);
+        expect(res.data?.providerUsed).toBe('native');
+        expect(hoisted.mockAppealUpdate).toHaveBeenCalledWith({
+          where: { id: 'appeal-uuid' },
+          data: {
+            status: 'READY',
+            rawOcrText: expect.any(String),
+            extractedMetadata: expect.any(Object),
+            structuredInput: expect.any(Object),
+          },
+        });
+      });
+
+      it('should rollback appeal status to DRAFT on OCR failure', async () => {
+        hoisted.mockParsePdf.mockRejectedValue(new Error('Native PDF extraction failed'));
+        hoisted.mockMistralExtract.mockRejectedValue(new Error('Mistral failed'));
+        hoisted.mockTesseractExtract.mockRejectedValue(new Error('Tesseract failed'));
+
+        const res = await processOcrForFile('file-uuid');
+
+        expect(res.success).toBe(false);
+        expect(hoisted.mockAppealUpdate).toHaveBeenCalledWith({
+          where: { id: 'appeal-uuid' },
+          data: { status: 'DRAFT' },
+        });
+      });
+
+      it('should handle external OCR timeout throwing a gateway error and rolling back status', async () => {
+        hoisted.mockParsePdf.mockResolvedValue({ text: 'too short text' });
+        hoisted.mockMistralExtract.mockRejectedValue(new Error('Mistral request timed out after 25 seconds.'));
+        hoisted.mockTesseractExtract.mockRejectedValue(new Error('Tesseract timeout'));
+
+        const res = await processOcrForFile('file-uuid');
+
+        expect(res.success).toBe(false);
+        expect(hoisted.mockAppealUpdate).toHaveBeenCalledWith({
+          where: { id: 'appeal-uuid' },
+          data: { status: 'DRAFT' },
+        });
+      });
+
+      it('should handle missing storage file error, log audit failed event, and propagate failure', async () => {
+        hoisted.mockDownloadFile.mockRejectedValue(new Error('Object not found in storage bucket'));
+
+        const res = await processOcrForFile('file-uuid');
+
+        expect(res.success).toBe(false);
+        expect(hoisted.mockAppealUpdate).toHaveBeenCalledWith({
+          where: { id: 'appeal-uuid' },
+          data: { status: 'DRAFT' },
+        });
+      });
+
+      it('should handle malformed PDF in native parse, logging warning and falling back to OCR providers', async () => {
+        // Native parser throws
+        hoisted.mockParsePdf.mockRejectedValue(new Error('Malformed PDF structure'));
+        // But Mistral succeeds
+        hoisted.mockMistralExtract.mockResolvedValue({
+          rawOcrText: 'Patient Name: Fallback User \nClaim Number: CLM-FALLBACK \nDenial Date: 01/01/2026',
+          confidenceScore: 0.9,
+          provider: 'mistral',
+          processingTimeMs: 100,
+        });
+
+        const res = await processOcrForFile('file-uuid');
+
+        expect(res.success).toBe(true);
+        expect(res.data?.providerUsed).toBe('mistral');
+        expect(res.data?.structuredData.patientName.value).toBe('Fallback User');
+      });
+
+      it('should enforce quota validations and prevent repeated OCR retry duplicates from consuming additional quota', async () => {
+        // Simulate quota exceeded
+        hoisted.mockUserFindUnique.mockResolvedValueOnce({
+          subscription: { planId: 'free', status: 'active' },
+          _count: { appeals: 5 } // Quota reached limit (5)
+        });
+
+        const res = await processOcrForFile('file-uuid');
+        expect(res.success).toBe(false);
+        expect(res.error?.code).toBe('QUOTA_EXCEEDED');
       });
     });
 

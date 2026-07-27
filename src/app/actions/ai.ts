@@ -51,13 +51,21 @@ export async function generateAppealAction(appealId: string): Promise<ActionResp
     });
 
     // Check billing quota limits
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
         subscription: true,
         _count: {
           select: {
-            appeals: true,
+            appeals: {
+              where: {
+                createdAt: { gte: startOfMonth },
+              },
+            },
           },
         },
       },

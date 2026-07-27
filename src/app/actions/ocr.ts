@@ -9,6 +9,7 @@ import { ApiError, UnauthorizedError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import { type ActionResponse } from './auth';
+import { parsePdf } from '@/lib/ocr/pdf-parser';
 export interface OcrProcessingResponse {
   appealId: string;
   fileId: string;
@@ -46,13 +47,21 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
     });
 
     // Check billing quota limits
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
         subscription: true,
         _count: {
           select: {
-            appeals: true,
+            appeals: {
+              where: {
+                createdAt: { gte: startOfMonth },
+              },
+            },
           },
         },
       },
@@ -101,8 +110,7 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
     if (fileRecord.mimeType === 'application/pdf') {
       try {
         log.info({ correlationId }, 'Attempting native PDF text extraction first');
-        const pdfParse = require('pdf-parse');
-        const pdfData = await pdfParse(fileBuffer);
+        const pdfData = await parsePdf(fileBuffer);
         const extractedText = (pdfData.text || '').trim();
         
         // If native extraction finds sufficient text content, use it directly (faster and highly accurate)
