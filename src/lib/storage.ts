@@ -1,4 +1,4 @@
-import { createServerSideClient, createAdminClient } from '@/lib/supabase';
+import { createAdminClient } from '@/lib/supabase';
 import { ApiError } from '@/lib/errors';
 import log from '@/lib/logger';
 
@@ -23,7 +23,7 @@ export class SupabaseStorageProvider implements StorageProvider {
   private bucketName = 'denials';
 
   async uploadFile(storagePath: string, buffer: Buffer, mimeType: string): Promise<void> {
-    const supabase = await createServerSideClient();
+    const supabase = createAdminClient();
     const { error } = await supabase.storage
       .from(this.bucketName)
       .upload(storagePath, buffer, {
@@ -32,7 +32,7 @@ export class SupabaseStorageProvider implements StorageProvider {
       });
 
     if (error) {
-      log.error({ storagePath }, 'Supabase Storage file upload failed', error);
+      log.error({ storagePath, bucketName: this.bucketName, operation: 'uploadFile', errorCode: error.name, errorMessage: error.message }, 'Supabase Storage file upload failed');
       throw new ApiError(500, 'STORAGE_UPLOAD_ERROR', 'Failed to upload file to storage.');
     }
   }
@@ -117,15 +117,27 @@ export class SupabaseStorageProvider implements StorageProvider {
    * Expiration defaults to 15 minutes (900 seconds).
    */
   async generateDownloadUrl(storagePath: string): Promise<string> {
-    const supabase = await createServerSideClient();
+    log.info({ 
+      bucketName: this.bucketName, 
+      storagePathExists: !!storagePath, 
+      operation: 'generateDownloadUrl' 
+    }, 'Diagnostic: Generating signed download URL');
+
+    const supabase = createAdminClient();
     
     const { data, error } = await supabase.storage
       .from(this.bucketName)
       .createSignedUrl(storagePath, 900); // 15 mins expiry
 
     if (error) {
-      log.error({ storagePath }, 'Supabase Storage signed download URL generation failed', error);
-      throw new ApiError(500, 'STORAGE_DOWNLOAD_ERROR', 'Failed to retrieve file download URL.');
+      log.error({ 
+        bucketName: this.bucketName,
+        storagePathExists: !!storagePath,
+        operation: 'generateDownloadUrl',
+        supabaseErrorCode: error.name || 'N/A',
+        supabaseErrorMessage: error.message 
+      }, 'Diagnostic: Supabase Storage signed download URL generation failed');
+      throw new ApiError(500, 'STORAGE_DOWNLOAD_ERROR', `Failed to retrieve file download URL: ${error.message}`);
     }
 
     return data.signedUrl;
@@ -135,14 +147,14 @@ export class SupabaseStorageProvider implements StorageProvider {
    * Deletes a file from Supabase Storage bucket.
    */
   async deleteFile(storagePath: string): Promise<void> {
-    const supabase = await createServerSideClient();
+    const supabase = createAdminClient();
     
     const { error } = await supabase.storage
       .from(this.bucketName)
       .remove([storagePath]);
 
     if (error) {
-      log.error({ storagePath }, 'Supabase Storage file deletion failed', error);
+      log.error({ storagePath, bucketName: this.bucketName, operation: 'deleteFile', errorCode: error.name, errorMessage: error.message }, 'Supabase Storage file deletion failed');
       throw new ApiError(500, 'STORAGE_DELETION_ERROR', 'Failed to delete file from storage bucket.');
     }
   }
@@ -151,14 +163,14 @@ export class SupabaseStorageProvider implements StorageProvider {
    * Downloads a file from Supabase Storage private bucket and returns its binary Buffer.
    */
   async downloadFile(storagePath: string): Promise<Buffer> {
-    const supabase = await createServerSideClient();
+    const supabase = createAdminClient();
     
     const { data, error } = await supabase.storage
       .from(this.bucketName)
       .download(storagePath);
 
     if (error) {
-      log.error({ storagePath }, 'Supabase Storage file download failed', error);
+      log.error({ storagePath, bucketName: this.bucketName, operation: 'downloadFile', errorCode: error.name, errorMessage: error.message }, 'Supabase Storage file download failed');
       throw new ApiError(500, 'STORAGE_DOWNLOAD_ERROR', 'Failed to download file from bucket.');
     }
 
