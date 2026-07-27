@@ -30,7 +30,7 @@
     "lucide-react": "^0.470.0",
     "next": "^15.0.3",
     "openai": "^4.40.1",
-    "pdf-parse": "^2.4.5",
+    "pdf-parse": "1.1.1",
     "pino": "^9.0.0",
     "postcss": "^8.4.38",
     "puppeteer": "^25.3.0",

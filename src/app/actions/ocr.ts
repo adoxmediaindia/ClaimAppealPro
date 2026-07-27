@@ -9,10 +9,6 @@ import { ApiError, UnauthorizedError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import { type ActionResponse } from './auth';
-
-// Use CommonJS require to load pdf-parse to bypass ESM default-export Webpack warnings
-const pdfParse = require('pdf-parse');
-
 export interface OcrProcessingResponse {
   appealId: string;
   fileId: string;
@@ -105,6 +101,7 @@ export async function processOcrForFile(fileId: string): Promise<ActionResponse<
     if (fileRecord.mimeType === 'application/pdf') {
       try {
         log.info({ correlationId }, 'Attempting native PDF text extraction first');
+        const pdfParse = require('pdf-parse');
         const pdfData = await pdfParse(fileBuffer);
         const extractedText = (pdfData.text || '').trim();
         
