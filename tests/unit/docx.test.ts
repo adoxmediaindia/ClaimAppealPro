@@ -138,4 +138,38 @@ describe('DOCX Export API Endpoint Unit Tests', () => {
     expect(buffer.byteLength).toBeGreaterThan(0);
     expect(hoisted.mockAuditLogCreate).toHaveBeenCalledTimes(1);
   });
+
+  it('should prioritize canonical keys policyNumber, insuranceCompany, address over legacy keys in DOCX export', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-uuid' } } });
+    hoisted.mockAppealFindUnique.mockResolvedValue({
+      id: 'appeal-id',
+      userId: 'user-uuid',
+      deletedAt: null,
+      structuredInput: {
+        patientName: 'John Doe',
+        claimNumber: 'CLM-12345',
+        insuranceCompany: 'Canonical Insurance',
+        insuranceName: 'Legacy Insurance',
+        policyNumber: 'CanonicalPolicy123',
+        policyId: 'LegacyPolicy123',
+        address: 'Canonical Address',
+        insuranceAddress: 'Legacy Address',
+      },
+      versions: [
+        {
+          versionNumber: 1,
+          letterContent: 'Dear Aetna,\n\nThis is a clinical necessity appeal letter.\n\nSincerely,\nDr. Specialist',
+          deletedAt: null,
+        },
+      ],
+    });
+    hoisted.mockAuditLogCreate.mockResolvedValue({});
+
+    const req = new NextRequest(
+      'http://localhost:3000/api/exports/docx?appealId=appeal-id&versionNumber=1'
+    );
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+  });
 });

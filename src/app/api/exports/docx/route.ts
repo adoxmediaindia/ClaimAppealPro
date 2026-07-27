@@ -86,12 +86,12 @@ export async function GET(req: NextRequest) {
     const sourceData = (appeal.structuredInput || appeal.extractedMetadata || {}) as Record<string, any>;
     const patientName = extractVal(sourceData.patientName) || 'N/A';
     const memberId = extractVal(sourceData.memberId) || 'N/A';
-    const policyId = extractVal(sourceData.policyId) || 'N/A';
+    const policyId = extractVal(sourceData.policyNumber || sourceData.policyId) || 'N/A';
     const claimNumber = extractVal(sourceData.claimNumber) || 'N/A';
     const denialDate = extractVal(sourceData.denialDate) || 'N/A';
     const denialReason = extractVal(sourceData.denialReason) || 'N/A';
-    const insuranceName = extractVal(sourceData.insuranceName) || 'N/A';
-    const insuranceAddress = extractVal(sourceData.insuranceAddress) || 'N/A';
+    const insuranceName = extractVal(sourceData.insuranceCompany || sourceData.insuranceName) || 'N/A';
+    const insuranceAddress = extractVal(sourceData.address || sourceData.insuranceAddress) || 'N/A';
 
     // 6. Compile DOCX Structure
     const docChildren: any[] = [];

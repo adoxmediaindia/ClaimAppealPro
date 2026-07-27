@@ -22,35 +22,49 @@ export interface OcrStructuredData {
 export class OcrNormalizer {
   
   /**
-   * Cleans white spaces, resolves line break formatting, and extracts structured fields using regular expressions.
+   * Cleans white spaces, resolves line break formatting, and extracts structured fields dynamically.
    */
   normalize(rawResult: OcrResult): OcrStructuredData {
     const text = rawResult.rawOcrText;
     const cleanText = this.cleanRawText(text);
     const confidence = rawResult.confidenceScore;
 
-    // 1. Regular expression extractions
-    const patientName = this.extractField(cleanText, /(?:Patient Name|Patient's Name|Patient):\s*(.*?)(?:\s{2,}|\r?\n|Member|Claim|Date|Provider|$)/i, 'Unknown Patient', confidence);
-    const insuranceCompany = this.extractField(cleanText, /(?:Insurance Company|Insurance|Payor):\s*(.*?)(?:\s{2,}|\r?\n|Patient|Claim|Member|Provider|$)/i, this.inferInsurance(cleanText), confidence);
-    const claimNumber = this.extractField(cleanText, /(?:Claim (?:Number|No\.?|ID|#)):\s*(.*?)(?:\s{2,}|\r?\n|Date|Member|Provider|$)/i, 'N/A', confidence);
-    const memberId = this.extractField(cleanText, /(?:Member (?:ID|Number|No\.?|#)):\s*(.*?)(?:\s{2,}|\r?\n|Claim|Date|Provider|$)/i, 'N/A', confidence);
-    const policyNumber = this.extractField(cleanText, /(?:Policy (?:ID|Number|No\.?|#)):\s*(.*?)(?:\s{2,}|\r?\n|Claim|Date|Provider|$)/i, 'N/A', confidence);
+    const config = {
+      patient: ['Patient Name', 'Patient\'s Name', 'Patient', 'Member Name', 'Insured Name'],
+      insurance: ['Insurance Company', 'Insurance Payor', 'Payor', 'Payer', 'Health Plan', 'Insurance'],
+      claim: ['Claim Number', 'Claim #', 'Claim ID', 'Claim No', 'Claim'],
+      memberId: ['Member ID', 'Member Number', 'Subscriber ID', 'Policy ID', 'Member'],
+      policyNumber: ['Policy Number', 'Policy ID', 'Policy #', 'Policy'],
+      dateOfService: ['Date of Service', 'Service Date', 'DOS'],
+      denialDate: ['Denial Date', 'Date of Denial', 'Date of Letter', 'Letter Date'],
+      provider: ['Provider Name', 'Provider', 'Physician', 'Doctor', 'Facility'],
+      denialReason: ['Reason for Denial', 'Denial Reason', 'Reason'],
+      appealDeadline: ['Appeal Deadline', 'Deadline', 'Must be submitted by'],
+      contactInformation: ['Contact Info', 'Contact Number', 'Phone', 'Telephone', 'Contact'],
+      address: ['Mailing Address', 'Address'],
+    };
+
+    // Extract fields dynamically using our generic parser
+    const patientName = this.extractFieldGeneric(cleanText, config.patient, 'Unknown Patient', confidence);
+    const insuranceCompany = this.extractFieldGeneric(cleanText, config.insurance, this.inferInsurance(cleanText), confidence);
+    const claimNumber = this.extractFieldGeneric(cleanText, config.claim, 'N/A', confidence);
+    const memberId = this.extractFieldGeneric(cleanText, config.memberId, 'N/A', confidence);
+    const policyNumber = this.extractFieldGeneric(cleanText, config.policyNumber, 'N/A', confidence);
     
-    // Service and Denial Date normalization
-    const dateOfService = this.extractDateField(cleanText, /(?:Date of Service|Service Date|DOS):\s*(.*?)(?:\s{2,}|\r?\n|Insurance|Provider|Procedure|$)/i, confidence);
-    const denialDate = this.extractDateField(cleanText, /(?:Denial Date|Date of Denial|Date of Letter|Date):\s*(.*?)(?:\s{2,}|\r?\n|Patient|Claim|Member|Provider|$)/i, confidence);
+    const dateOfService = this.extractDateFieldGeneric(cleanText, config.dateOfService, confidence);
+    const denialDate = this.extractDateFieldGeneric(cleanText, config.denialDate, confidence);
     
-    const providerName = this.extractField(cleanText, /(?:Provider Name|Provider|Physician|Doctor|Facility):\s*(.*?)(?:\s{2,}|\r?\n|Procedure|Claim|$)/i, 'Unknown Provider', confidence);
+    const providerName = this.extractFieldGeneric(cleanText, config.provider, 'Unknown Provider', confidence);
     
     // CPT/ICD code extraction (use lookbehind to exclude claim numbers, zip codes, dates, phone numbers, dollar amounts)
     const cptCodes = this.extractCodes(cleanText, /(?<![-#\w\.\/\$])\b\d{5}\b/g, confidence);
     const icdCodes = this.extractCodes(cleanText, /\b[A-Z]\d{2}(?:\.\d{1,4})?\b/gi, confidence);
     
-    const denialReason = this.extractField(cleanText, /(?:Reason for Denial|Denial Reason|Reason):\s*([^\n\r]+)/i, this.inferDenialReason(cleanText), confidence);
-    const appealDeadline = this.extractDateField(cleanText, /(?:Appeal Deadline|Deadline|Must be submitted by):\s*(.*?)(?:\s{2,}|\r?\n|Patient|Claim|Member|Provider|$)/i, confidence);
+    const denialReason = this.extractFieldGeneric(cleanText, config.denialReason, this.inferDenialReason(cleanText), confidence);
+    const appealDeadline = this.extractDateFieldGeneric(cleanText, config.appealDeadline, confidence);
     
-    const contactInformation = this.extractField(cleanText, /(?:Contact Info|Contact Number|Phone|Telephone):\s*([\d\s()-]+)/i, 'N/A', confidence);
-    const address = this.extractField(cleanText, /(?:Mailing Address|Address):\s*([^\n]+)/i, 'N/A', confidence);
+    const contactInformation = this.extractFieldGeneric(cleanText, config.contactInformation, 'N/A', confidence);
+    const address = this.extractFieldGeneric(cleanText, config.address, 'N/A', confidence);
 
     return {
       patientName,
@@ -84,26 +98,56 @@ export class OcrNormalizer {
       .trim();
   }
 
-  private extractField(text: string, regex: RegExp, fallback: string, defaultConf: number): OcrField<string> {
-    const match = text.match(regex);
+  private extractFieldGeneric(text: string, labels: string[], fallback: string, defaultConf: number): OcrField<string> {
+    // Strip bolding asterisks to normalize markdown bold headers
+    const clean = text.replace(/\*/g, '').trim();
+    
+    for (const label of labels) {
+      const escapedLabel = label.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      
+      // Pattern A: Same line separator (colon or pipe)
+      const sameLineRegex = new RegExp(`(?:^|[|:|\\s])(?:${escapedLabel})\\s*[|:]\\s*([^\\n\\r|:]+)`, 'i');
+      const sameLineMatch = clean.match(sameLineRegex);
+      if (sameLineMatch && sameLineMatch[1].trim()) {
+        const val = sameLineMatch[1].trim();
+        if (val !== 'N/A' && val !== 'Unknown') {
+          return {
+            value: val,
+            confidence: defaultConf,
+            sourcePage: 1
+          };
+        }
+      }
+      
+      // Pattern B: Next line value (separated by newline)
+      const multiLineRegex = new RegExp(`(?:^|[|:\\s])(?:${escapedLabel})\\s*\\r?\\n\\s*([^\\n\\r|:]+)`, 'i');
+      const multiLineMatch = clean.match(multiLineRegex);
+      if (multiLineMatch && multiLineMatch[1].trim()) {
+        const val = multiLineMatch[1].trim();
+        const isAnotherLabel = /Patient|Member|Claim|Policy|Insurance|Payor|Payer|Plan|Provider|Physician|Doctor|Facility|Date|DOS|CPT|Procedure|Reason/i.test(val);
+        if (!isAnotherLabel && val !== 'N/A' && val !== 'Unknown') {
+          return {
+            value: val,
+            confidence: defaultConf,
+            sourcePage: 1
+          };
+        }
+      }
+    }
+    
     return {
-      value: match ? match[1].trim() : fallback,
-      confidence: match ? defaultConf : 0.0,
-      sourcePage: 1,
+      value: fallback,
+      confidence: 0.0,
+      sourcePage: 1
     };
   }
 
-  private extractDateField(text: string, regex: RegExp, defaultConf: number): OcrField<string> {
-    const match = text.match(regex);
-    let dateVal = 'N/A';
-    if (match) {
-      dateVal = this.normalizeDateString(match[1].trim());
+  private extractDateFieldGeneric(text: string, labels: string[], defaultConf: number): OcrField<string> {
+    const rawField = this.extractFieldGeneric(text, labels, 'N/A', defaultConf);
+    if (rawField.value && rawField.value !== 'N/A') {
+      rawField.value = this.normalizeDateString(rawField.value);
     }
-    return {
-      value: dateVal,
-      confidence: match ? defaultConf : 0.0,
-      sourcePage: 1,
-    };
+    return rawField;
   }
 
   private normalizeDateString(dateStr: string): string {
@@ -118,7 +162,6 @@ export class OcrNormalizer {
       return dateStr;
     }
   }
-
 
   private extractCodes(text: string, regex: RegExp, defaultConf: number): OcrField<string[]> {
     const matches = text.match(regex);

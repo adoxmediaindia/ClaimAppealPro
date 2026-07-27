@@ -176,6 +176,106 @@ The claim was denied because the submitted documentation does not demonstrate th
       expect(result.denialDate.value).toBe('N/A');
       expect(result.policyNumber.value).toBe('N/A');
     });
+
+    it('should parse Layout A (Markdown Table format) with dynamic fake values', () => {
+      const rawText = `
+| Patient Name | Alice Smith |
+| Member ID | SUB-98765 |
+| Claim Number | CLM-999-ABC |
+| Date of Service | August 15, 2026 |
+| Insurance Company | Alpha Health |
+| Provider | Dr. Elizabeth Blackwell |
+| Procedure Code | 99213 |
+`;
+
+      const mockRaw = {
+        rawOcrText: rawText,
+        confidenceScore: 0.9,
+        provider: 'mistral' as const,
+        processingTimeMs: 100,
+      };
+
+      const result = normalizer.normalize(mockRaw);
+
+      expect(result.patientName.value).toBe('Alice Smith');
+      expect(result.memberId.value).toBe('SUB-98765');
+      expect(result.claimNumber.value).toBe('CLM-999-ABC');
+      expect(result.dateOfService.value).toBe('2026-08-15');
+      expect(result.insuranceCompany.value).toBe('Alpha Health');
+      expect(result.providerName.value).toBe('Dr. Elizabeth Blackwell');
+      expect(result.cptCodes.value).toEqual(['99213']);
+    });
+
+    it('should parse Layout B (Plain key:value text) with dynamic fake values', () => {
+      const rawText = `
+Patient: Bob Johnson
+Subscriber ID: SUB-555-XYZ
+Claim ID: CLM-88888
+DOS: 05/12/2026
+Health Plan: Beta Care
+Facility: General Hospital
+CPT Code: 93000
+`;
+
+      const mockRaw = {
+        rawOcrText: rawText,
+        confidenceScore: 0.9,
+        provider: 'mistral' as const,
+        processingTimeMs: 100,
+      };
+
+      const result = normalizer.normalize(mockRaw);
+
+      expect(result.patientName.value).toBe('Bob Johnson');
+      expect(result.memberId.value).toBe('SUB-555-XYZ');
+      expect(result.claimNumber.value).toBe('CLM-88888');
+      expect(result.dateOfService.value).toBe('2026-05-12');
+      expect(result.insuranceCompany.value).toBe('Beta Care');
+      expect(result.providerName.value).toBe('General Hospital');
+      expect(result.cptCodes.value).toEqual(['93000']);
+    });
+
+    it('should parse Layout C (Multiline / Markdown OCR) with dynamic fake values', () => {
+      const rawText = `
+**Insured Name**
+Charlie Brown
+
+**Member Number**
+MBR-12345
+
+**Claim No**
+CLM-11111
+
+**Service Date**
+2026-12-25
+
+**Payer**
+Gamma Shield
+
+**Physician**
+Dr. Watson
+
+**CPT**
+99214
+`;
+
+      const mockRaw = {
+        rawOcrText: rawText,
+        confidenceScore: 0.9,
+        provider: 'mistral' as const,
+        processingTimeMs: 100,
+      };
+
+      const result = normalizer.normalize(mockRaw);
+
+      expect(result.patientName.value).toBe('Charlie Brown');
+      expect(result.memberId.value).toBe('MBR-12345');
+      expect(result.claimNumber.value).toBe('CLM-11111');
+      expect(result.dateOfService.value).toBe('2026-12-25');
+      expect(result.insuranceCompany.value).toBe('Gamma Shield');
+      expect(result.providerName.value).toBe('Dr. Watson');
+      expect(result.cptCodes.value).toEqual(['99214']);
+    });
   });
 
   describe('OcrValidator Warnings Alerts', () => {
