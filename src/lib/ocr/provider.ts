@@ -42,25 +42,26 @@ export class MistralOcrProvider implements OcrProvider {
     const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
-      // In production, we send a multipart form request containing the file buffer.
-      // We construct the multipart request boundary manually or via standard fetch utilities.
-      const boundary = `----Boundary-${crypto.randomUUID()}`;
-      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="document.pdf"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-      const footer = `\r\n--${boundary}--\r\n`;
+      const base64Content = fileBuffer.toString('base64');
+      const documentType = mimeType.startsWith('image/') ? 'image_url' : 'document_url';
+      const dataUrl = `data:${mimeType};base64,${base64Content}`;
 
-      const requestBody = Buffer.concat([
-        Buffer.from(header, 'utf-8'),
-        fileBuffer,
-        Buffer.from(footer, 'utf-8'),
-      ]);
+      const requestBody = JSON.stringify({
+        model: 'mistral-ocr-latest',
+        document: {
+          type: documentType,
+          [documentType]: dataUrl,
+        },
+        include_image_base64: false,
+      });
 
       const res = await fetch(this.endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
-        body: requestBody as any,
+        body: requestBody,
         signal: controller.signal,
       });
 
@@ -69,7 +70,21 @@ export class MistralOcrProvider implements OcrProvider {
       if (!res.ok) {
         const errorText = await res.text();
         log.error({ correlationId, status: res.status, errorText }, 'Mistral OCR API call failed');
-        throw new ApiError(res.status, 'MISTRAL_API_ERROR', `Mistral OCR extraction failed: ${errorText}`);
+        
+        let errorCode = 'MISTRAL_API_ERROR';
+        if (res.status === 401 || res.status === 403) {
+          errorCode = 'MISTRAL_AUTH_ERROR';
+        } else if (res.status === 413) {
+          errorCode = 'MISTRAL_PAYLOAD_TOO_LARGE';
+        } else if (res.status === 422) {
+          errorCode = 'MISTRAL_INVALID_REQUEST';
+        } else if (res.status === 429) {
+          errorCode = 'MISTRAL_RATE_LIMIT';
+        } else if (res.status >= 500) {
+          errorCode = 'MISTRAL_SERVER_ERROR';
+        }
+        
+        throw new ApiError(res.status, errorCode, `Mistral OCR extraction failed: ${errorText}`);
       }
 
       const responseData: any = await res.json();
@@ -77,14 +92,25 @@ export class MistralOcrProvider implements OcrProvider {
       // Parse raw text aggregated across pages
       const rawOcrText = responseData.pages?.map((p: any) => p.markdown || p.text).join('\n') || '';
       
+      if (!rawOcrText.trim()) {
+        log.error({ correlationId }, 'Mistral OCR response returned empty text content');
+        throw new ApiError(422, 'MISTRAL_EMPTY_RESPONSE', 'Mistral OCR completed but no text could be extracted from the document.');
+      }
+
       // Calculate aggregate confidence score across parsed tokens
-      const confidenceScore = responseData.pages?.reduce((acc: number, p: any) => acc + (p.confidence || 0.95), 0) / (responseData.pages?.length || 1);
+      let confidenceScore = 0.95;
+      if (responseData.pages && responseData.pages.length > 0) {
+        const sum = responseData.pages.reduce((acc: number, p: any) => acc + (p.confidence || 0.95), 0);
+        confidenceScore = sum / responseData.pages.length;
+        // Round to 4 decimal places to avoid floating point precision issues
+        confidenceScore = Math.round(confidenceScore * 10000) / 10000;
+      }
 
       log.info({ correlationId, confidenceScore }, 'Mistral OCR completed successfully');
 
       return {
         rawOcrText,
-        confidenceScore: confidenceScore || 0.95,
+        confidenceScore,
         provider: 'mistral',
         processingTimeMs: Date.now() - startTime,
       };
