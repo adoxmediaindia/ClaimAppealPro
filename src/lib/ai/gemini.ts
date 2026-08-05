@@ -4,9 +4,10 @@ import { PromptBuilder } from './promptBuilder';
 import { AppealFormatter } from './formatter';
 import log from '@/lib/logger';
 import { ApiError } from '@/lib/errors';
+import config from '@/config';
 
 export class GeminiAiProvider implements AiProvider {
-  private model = 'gemini-2.5-flash';
+  private model = config.GEMINI_MODEL || 'gemini-3.5-flash';
   private client: GoogleGenAI | null = null;
 
   private isMockMode(): boolean {
