@@ -109,7 +109,7 @@ export const createAdminClient = () => {
     }
   );
 
-  const isTest = process.env.NODE_ENV === 'test';
+  const isTest = process.env.NODE_ENV === 'test' || process.env.MOCK_DATABASE === 'true';
   if (isTest) {
     client.storage.getBucket = async (_id: string) => {
       return { data: { id: 'denials' }, error: null } as any;
