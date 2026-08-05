@@ -101,10 +101,19 @@ You must output ONLY a valid JSON object matching the requested schema.`;
 
     while (attempts < maxAttempts) {
       attempts++;
+      const startTime = Date.now();
+      const startTimestamp = new Date().toISOString();
       try {
-        log.info({ correlationId, attempt: attempts }, 'Sending content generation request to Gemini');
+        const payloadLength = (systemInstruction || '').length + (prompt || '').length;
+        log.info({ 
+          correlationId, 
+          attempt: attempts, 
+          startTime: startTimestamp,
+          payloadLength,
+          model: this.model
+        }, 'Sending content generation request to Gemini');
 
-        // We wrap the SDK call in a 15 second timeout promise
+        // We wrap the SDK call in a 60 second timeout promise
         const responsePromise = client.models.generateContent({
           model: this.model,
           contents: `${systemInstruction}\n\n${prompt}`,
@@ -127,10 +136,11 @@ You must output ONLY a valid JSON object matching the requested schema.`;
         });
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new ApiError(504, 'GEMINI_TIMEOUT', 'Gemini request timed out after 15 seconds.')), 15000)
+          setTimeout(() => reject(new ApiError(504, 'GEMINI_TIMEOUT', 'Gemini request timed out after 60 seconds.')), 60000)
         );
 
         const response: any = await Promise.race([responsePromise, timeoutPromise]);
+        const durationMs = Date.now() - startTime;
 
         const rawText = response.text;
         if (!rawText) {
@@ -163,11 +173,12 @@ You must output ONLY a valid JSON object matching the requested schema.`;
         };
 
         result.formattedLetter = formatter.format(result);
-        log.info({ correlationId, totalTokens, cost }, 'Gemini appeal letter generation succeeded');
+        log.info({ correlationId, totalTokens, cost, durationMs }, 'Gemini appeal letter generation succeeded');
         return result;
       } catch (error: any) {
         lastError = error;
-        log.warn({ correlationId, attempt: attempts, error: error.message }, 'Gemini appeal generation attempt failed');
+        const durationMs = Date.now() - startTime;
+        log.warn({ correlationId, attempt: attempts, durationMs, error: error.message, status: error.status, errorCode: error.errorCode || 'N/A' }, 'Gemini appeal generation attempt failed');
 
         // Identify retryable errors
         const isRateLimit = error.status === 429 || error.message?.includes('429') || error.message?.includes('ResourceExhausted') || error.errorCode === 'GEMINI_RATE_LIMIT';

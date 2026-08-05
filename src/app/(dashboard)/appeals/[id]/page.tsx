@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
 import { SupabaseStorageProvider } from '@/lib/storage';
+
+export const maxDuration = 60;
 import OcrReviewForm from '@/components/shared/OcrReviewForm';
 import OcrProcessingView from '@/components/shared/OcrProcessingView';
 import AiAppealView from '@/components/shared/AiAppealView';
