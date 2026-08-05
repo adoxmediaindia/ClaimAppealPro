@@ -139,15 +139,22 @@ You must output ONLY a valid JSON object matching the requested schema.`;
           setTimeout(() => reject(new ApiError(504, 'GEMINI_TIMEOUT', 'Gemini request timed out after 60 seconds.')), 60000)
         );
 
+        log.info({ correlationId, attempt: attempts }, 'Diagnostic: About to await Promise.race for Gemini response');
         const response: any = await Promise.race([responsePromise, timeoutPromise]);
         const durationMs = Date.now() - startTime;
+        log.info({ correlationId, attempt: attempts, durationMs }, 'Diagnostic: Promise.race resolved successfully');
 
+        log.info({ correlationId, attempt: attempts }, 'Diagnostic: Accessing response.text property');
         const rawText = response.text;
+        log.info({ correlationId, attempt: attempts, rawTextLength: rawText?.length || 0 }, 'Diagnostic: response.text retrieved');
+
         if (!rawText) {
           throw new ApiError(500, 'GEMINI_RESPONSE_EMPTY', 'Gemini returned an empty completion response.');
         }
 
+        log.info({ correlationId, attempt: attempts }, 'Diagnostic: About to parse JSON response');
         const parsed = JSON.parse(rawText.trim());
+        log.info({ correlationId, attempt: attempts }, 'Diagnostic: JSON response parsed successfully');
 
         const promptTokens = response.usageMetadata?.promptTokenCount || 200;
         const completionTokens = response.usageMetadata?.candidatesTokenCount || 400;
