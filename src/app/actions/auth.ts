@@ -50,6 +50,7 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
 
     const supabase = await createServerSideClient();
 
+    log.info({ correlationId, email }, 'Logging: Before Supabase Auth signUp');
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -62,6 +63,11 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         },
       },
     });
+    log.info({
+      correlationId,
+      email,
+      authError: authError ? { code: authError.code, message: authError.message, status: authError.status } : null
+    }, 'Logging: After Supabase Auth signUp');
 
     if (authError) {
       log.error({ correlationId, email, errorCode: authError.code }, 'Supabase auth registration failed', authError);
@@ -76,7 +82,9 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
     log.info({ correlationId, userId: supabaseUser.id, email }, 'Supabase Auth registration succeeded');
 
     try {
+      log.info({ correlationId, userId: supabaseUser.id }, 'Logging: Before Prisma transaction');
       await prisma.$transaction(async (tx) => {
+        log.info({ correlationId, userId: supabaseUser.id }, 'Logging: Before User upsert');
         const publicUser = await tx.user.upsert({
           where: { id: supabaseUser.id },
           update: { email },
@@ -86,6 +94,7 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
             role: 'USER',
           },
         });
+        log.info({ correlationId, userId: supabaseUser.id, publicUserId: publicUser.id }, 'Logging: After User upsert');
 
         await tx.profile.upsert({
           where: { userId: publicUser.id },
@@ -104,14 +113,21 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
           },
         });
       });
+      log.info({ correlationId, userId: supabaseUser.id }, 'Logging: After Prisma transaction');
       log.info({ correlationId, userId: supabaseUser.id }, 'Public schema synchronized successfully via Prisma transaction');
 
       // Send welcome email (non-blocking)
       sendWelcomeEmail(email, firstName).catch((err) => {
         log.error({ correlationId, error: err.message }, 'Failed to dispatch welcome email');
       });
-    } catch (dbError) {
-      log.error({ correlationId, userId: supabaseUser.id }, 'Prisma synchronization failed during registration', dbError);
+    } catch (dbError: any) {
+      log.error({
+        correlationId,
+        userId: supabaseUser.id,
+        prismaErrorCode: dbError?.code || 'N/A',
+        prismaErrorMeta: dbError?.meta || null,
+        stack: dbError?.stack || null
+      }, 'Prisma synchronization failed during registration', dbError);
       throw new DatabaseError(dbError);
     }
 
