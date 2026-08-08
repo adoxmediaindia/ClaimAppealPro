@@ -1,6 +1,12 @@
 const { execSync } = require('child_process');
 
 try {
+  // Ensure DIRECT_URL fallback exists for Prisma generate and migrations on Vercel
+  if (process.env.DATABASE_URL && !process.env.DIRECT_URL) {
+    console.log('DIRECT_URL is not set. Falling back to DATABASE_URL for build time commands.');
+    process.env.DIRECT_URL = process.env.DATABASE_URL;
+  }
+
   console.log('Generating Prisma Client...');
   execSync('npx prisma generate', { stdio: 'inherit' });
 
