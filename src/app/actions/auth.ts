@@ -1,11 +1,11 @@
 'use server';
 
 import { signUpSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, type SignUpInput, type LoginInput, type ForgotPasswordInput, type ResetPasswordInput } from '@/lib/validations/auth';
-import { createServerSideClient } from '@/lib/supabase';
+import { createServerSideClient, createAdminClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import config from '@/config';
-import { sendWelcomeEmail } from '@/lib/email/templates';
+import { sendWelcomeEmail, sendVerificationEmail } from '@/lib/email/templates';
 
 export interface ActionResponse<T> {
   success: boolean;
@@ -37,8 +37,8 @@ function getFriendlyAuthError(authError: { code?: string; message: string }): st
   if (code === 'email_limit_exceeded' || message.includes('rate limit') || message.includes('too many requests')) {
     return 'Verification email rate limit exceeded. Please try again in a few minutes.';
   }
-  if (code === 'user_already_exists' || message.includes('already registered') || message.includes('already exists')) {
-    return 'This email is already registered. Please login.';
+  if (code === 'user_already_exists' || message.includes('already registered') || message.includes('already exists') || message.includes('email_exists')) {
+    return 'This email is already registered. Please sign in.';
   }
   if (code === 'invalid_credentials' || message.includes('invalid credentials')) {
     return 'Invalid email address or incorrect password.';
@@ -62,7 +62,7 @@ function getFriendlyAuthError(authError: { code?: string; message: string }): st
 function getFriendlyDbError(error: any): string {
   const code = error?.code;
   if (code === 'P2002') {
-    return 'This email is already registered. Please login.';
+    return 'This email is already registered. Please sign in.';
   }
   if (code === 'P2025') {
     return 'The requested record was not found.';
@@ -101,7 +101,7 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
     const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
     const normalizedPhone = normalizePhone(phone);
 
-    // 2. Check if email already exists in public database
+    // 2. Check if email already exists in public database (Prisma check)
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -112,59 +112,55 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         success: false,
         error: {
           code: 'EMAIL_ALREADY_EXISTS',
-          message: 'This email is already registered. Please login.',
+          message: 'This email is already registered. Please sign in.',
         },
       };
     }
 
-    // 3. Call Supabase Auth
-    const supabase = await createServerSideClient();
-
-    log.info({ correlationId, email }, 'Logging: Before Supabase Auth signUp');
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // 3. Generate Link via Supabase Admin Client (creates user in Supabase Auth securely without SMTP rate-limits)
+    const adminClient = createAdminClient();
+    log.info({ correlationId, email }, 'Logging: Before generateLink');
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'signup',
       email,
       password,
       options: {
-        data: {
-          firstName,
-          lastName,
-          phone: normalizedPhone,
-          role: 'USER',
-        },
+        redirectTo: `${config.APP_URL}/api/v1/auth/callback?next=/dashboard`,
       },
     });
     log.info({
       correlationId,
       email,
-      authError: authError ? { code: authError.code, message: authError.message, status: authError.status } : null
-    }, 'Logging: After Supabase Auth signUp');
+      linkError: linkError ? { code: linkError.code, message: linkError.message } : null
+    }, 'Logging: After generateLink');
 
-    // 4. Handle Supabase errors
-    if (authError) {
-      log.error({ correlationId, email, errorCode: authError.code }, 'Supabase auth registration failed', authError);
+    if (linkError) {
+      log.error({ correlationId, email, errorCode: linkError.code }, 'Supabase auth registration failed', linkError);
       return {
         success: false,
         error: {
           code: 'REGISTRATION_FAILED',
-          message: getFriendlyAuthError(authError),
+          message: getFriendlyAuthError(linkError),
         },
       };
     }
 
-    const supabaseUser = authData.user;
-    if (!supabaseUser) {
+    const supabaseUser = linkData.user;
+    const actionLink = linkData.properties?.action_link;
+
+    if (!supabaseUser || !actionLink) {
       return {
         success: false,
         error: {
           code: 'REGISTRATION_FAILED',
-          message: 'Registration failed. User object was not returned by auth service.',
+          message: 'Registration failed. Verification link could not be generated.',
         },
       };
     }
 
-    log.info({ correlationId, userId: supabaseUser.id, email }, 'Supabase Auth registration succeeded');
+    log.info({ correlationId, userId: supabaseUser.id, email }, 'Supabase Auth user created and link generated');
 
-    // 5. Create user in Prisma and Profile inside a transaction
+    // 4. Create User and Profile in Prisma inside transaction
     try {
       log.info({ correlationId, userId: supabaseUser.id }, 'Logging: Before Prisma transaction');
       await prisma.$transaction(async (tx) => {
@@ -198,20 +194,21 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         });
       });
       log.info({ correlationId, userId: supabaseUser.id }, 'Logging: After Prisma transaction');
-      log.info({ correlationId, userId: supabaseUser.id }, 'Public schema synchronized successfully via Prisma transaction');
-
-      // 8. Send welcome email (non-blocking)
-      sendWelcomeEmail(email, firstName).catch((err) => {
-        log.error({ correlationId, error: err.message }, 'Failed to dispatch welcome email');
-      });
     } catch (dbError: any) {
       log.error({
         correlationId,
         userId: supabaseUser.id,
         prismaErrorCode: dbError?.code || 'N/A',
-        prismaErrorMeta: dbError?.meta || null,
-        stack: dbError?.stack || null
-      }, 'Prisma synchronization failed during registration', dbError);
+        prismaErrorMeta: dbError?.meta || null
+      }, 'Prisma transaction failed. Rolling back Supabase Auth user.', dbError);
+      
+      // Rollback: Delete the newly created user in Supabase Auth to prevent orphan accounts
+      try {
+        await adminClient.auth.admin.deleteUser(supabaseUser.id);
+        log.info({ correlationId, userId: supabaseUser.id }, 'Supabase Auth user rolled back successfully');
+      } catch (rollbackErr: any) {
+        log.error({ correlationId, userId: supabaseUser.id, error: rollbackErr.message }, 'Failed to rollback/delete Supabase user');
+      }
 
       return {
         success: false,
@@ -221,6 +218,21 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         },
       };
     }
+
+    // 5. Send verification email via Resend
+    try {
+      const emailSent = await sendVerificationEmail(email, actionLink);
+      if (!emailSent) {
+        log.error({ correlationId, email }, 'Resend failed to send verification email');
+      }
+    } catch (emailErr: any) {
+      log.error({ correlationId, email, error: emailErr.message }, 'Resend verification email dispatch threw an exception');
+    }
+
+    // 6. Send welcome email (non-blocking)
+    sendWelcomeEmail(email, firstName).catch((err) => {
+      log.error({ correlationId, error: err.message }, 'Failed to dispatch welcome email');
+    });
 
     return {
       success: true,
@@ -439,17 +451,25 @@ export async function requestPasswordReset(input: ForgotPasswordInput): Promise<
     }
 
     const { email } = result.data;
-    const supabase = await createServerSideClient();
+    const adminClient = createAdminClient();
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${config.APP_URL}/api/v1/auth/callback?next=/reset-password`,
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: {
+        redirectTo: `${config.APP_URL}/api/v1/auth/callback?next=/reset-password`,
+      },
     });
 
-    if (resetError) {
+    if (linkError) {
       log.warn(
-        { correlationId, email, errorCode: resetError.code, error: resetError },
-        'Supabase password reset request trigger failed'
+        { correlationId, email, errorCode: linkError.code, error: linkError },
+        'Supabase password reset link generation failed'
       );
+    } else if (linkData?.properties?.action_link) {
+      const actionLink = linkData.properties.action_link;
+      const { sendPasswordResetEmail } = await import('@/lib/email/templates');
+      await sendPasswordResetEmail(email, actionLink);
     }
 
     log.info({ correlationId, email }, 'Password reset email triggered successfully (generic response returned)');

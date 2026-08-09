@@ -44,6 +44,8 @@ const {
   mockUpdateUser,
   mockSignInWithOAuth,
   mockExchangeCodeForSession,
+  mockGenerateLink,
+  mockDeleteUser,
 } = vi.hoisted(() => ({
   mockSignUp: vi.fn(),
   mockSignInWithPassword: vi.fn(),
@@ -53,6 +55,8 @@ const {
   mockUpdateUser: vi.fn(),
   mockSignInWithOAuth: vi.fn(),
   mockExchangeCodeForSession: vi.fn(),
+  mockGenerateLink: vi.fn(),
+  mockDeleteUser: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase', () => ({
@@ -66,6 +70,14 @@ vi.mock('@/lib/supabase', () => ({
       updateUser: mockUpdateUser,
       signInWithOAuth: mockSignInWithOAuth,
       exchangeCodeForSession: mockExchangeCodeForSession,
+    },
+  }),
+  createAdminClient: () => ({
+    auth: {
+      admin: {
+        generateLink: mockGenerateLink,
+        deleteUser: mockDeleteUser,
+      },
     },
   }),
 }));
@@ -82,8 +94,11 @@ describe('Authentication & Profile Upgraded Tests', () => {
 
   describe('signUpUser Server Action', () => {
     it('should split fullName, validate E.164 phone, and create user and profile on Supabase and PostgreSQL', async () => {
-      mockSignUp.mockResolvedValue({
-        data: { user: { id: 'mock-uuid', email: 'test@example.com' }, session: null },
+      mockGenerateLink.mockResolvedValue({
+        data: {
+          user: { id: 'mock-uuid', email: 'test@example.com' },
+          properties: { action_link: 'https://mock.supabase.co/verify?code=123' },
+        },
         error: null,
       });
 
@@ -99,11 +114,12 @@ describe('Authentication & Profile Upgraded Tests', () => {
         clinicName: 'Main Street Clinic',
       });
 
-      expect(mockSignUp).toHaveBeenCalledWith({
+      expect(mockGenerateLink).toHaveBeenCalledWith({
+        type: 'signup',
         email: 'test@example.com',
         password: 'Password123!',
         options: {
-          data: { firstName: 'Michael', lastName: 'Johnson', phone: '+15555555555', role: 'USER' },
+          redirectTo: expect.stringContaining('/api/v1/auth/callback'),
         },
       });
       expect(response.success).toBe(true);
@@ -124,8 +140,11 @@ describe('Authentication & Profile Upgraded Tests', () => {
     });
 
     it('should validate and accept international/US phone formatting', async () => {
-      mockSignUp.mockResolvedValue({
-        data: { user: { id: 'mock-uuid', email: 'test@example.com' }, session: null },
+      mockGenerateLink.mockResolvedValue({
+        data: {
+          user: { id: 'mock-uuid', email: 'test@example.com' },
+          properties: { action_link: 'https://mock.supabase.co/verify?code=123' },
+        },
         error: null,
       });
 
@@ -185,11 +204,21 @@ describe('Authentication & Profile Upgraded Tests', () => {
   describe('Password Reset Server Actions', () => {
     describe('requestPasswordReset', () => {
       it('should trigger Supabase reset request and return success generically', async () => {
-        mockResetPasswordForEmail.mockResolvedValue({ error: null });
+        mockGenerateLink.mockResolvedValue({
+          data: {
+            user: { id: 'mock-uuid', email: 'user@example.com' },
+            properties: { action_link: 'https://mock.supabase.co/recovery?code=123' },
+          },
+          error: null,
+        });
 
         const response = await requestPasswordReset({ email: 'user@example.com' });
 
-        expect(mockResetPasswordForEmail).toHaveBeenCalledWith('user@example.com', expect.any(Object));
+        expect(mockGenerateLink).toHaveBeenCalledWith({
+          type: 'recovery',
+          email: 'user@example.com',
+          options: expect.any(Object),
+        });
         expect(response.success).toBe(true);
       });
 
