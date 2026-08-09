@@ -2,7 +2,6 @@
 
 import { signUpSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, type SignUpInput, type LoginInput, type ForgotPasswordInput, type ResetPasswordInput } from '@/lib/validations/auth';
 import { createServerSideClient } from '@/lib/supabase';
-import { ValidationError, ApiError, DatabaseError, UnauthorizedError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import log from '@/lib/logger';
 import config from '@/config';
@@ -26,6 +25,52 @@ function normalizePhone(phone: string): string {
 }
 
 /**
+ * Translates Supabase auth errors to friendly user-facing messages.
+ */
+function getFriendlyAuthError(authError: { code?: string; message: string }): string {
+  const code = authError.code?.toLowerCase() || '';
+  const message = authError.message.toLowerCase();
+
+  if (code === 'signup_disabled') {
+    return 'Registration is currently disabled.';
+  }
+  if (code === 'email_limit_exceeded' || message.includes('rate limit') || message.includes('too many requests')) {
+    return 'Verification email rate limit exceeded. Please try again in a few minutes.';
+  }
+  if (code === 'user_already_exists' || message.includes('already registered') || message.includes('already exists')) {
+    return 'This email is already registered. Please login.';
+  }
+  if (code === 'invalid_credentials' || message.includes('invalid credentials')) {
+    return 'Invalid email address or incorrect password.';
+  }
+  if (code === 'weak_password' || message.includes('weak password') || message.includes('should be at least')) {
+    return 'Password is too weak. Please use a stronger password.';
+  }
+  if (message.includes('network') || message.includes('fetch') || message.includes('timeout')) {
+    return 'A network failure occurred. Please check your internet connection and try again.';
+  }
+  if (message.includes('database') || message.includes('server error') || message.includes('unavailable')) {
+    return 'The authentication service is temporarily unavailable. Please try again later.';
+  }
+
+  return 'Registration failed. Please verify your details and try again.';
+}
+
+/**
+ * Translates Prisma DB errors to friendly user-facing messages.
+ */
+function getFriendlyDbError(error: any): string {
+  const code = error?.code;
+  if (code === 'P2002') {
+    return 'This email is already registered. Please login.';
+  }
+  if (code === 'P2025') {
+    return 'The requested record was not found.';
+  }
+  return 'A database error occurred while processing your request. Please try again later.';
+}
+
+/**
  * Registers a new user account with Supabase Auth and creates corresponding DB records.
  */
 export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ email: string; requiresVerification: boolean }>> {
@@ -33,13 +78,21 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
   log.info({ correlationId, email: input.email }, 'User registration attempt started');
 
   try {
+    // 1. Validate request inputs
     const result = signUpSchema.safeParse(input);
     if (!result.success) {
       const fieldErrors: Record<string, string[]> = {};
       Object.entries(result.error.flatten().fieldErrors).forEach(([key, val]) => {
         if (val) fieldErrors[key] = val;
       });
-      throw new ValidationError('Validation failed for registration input.', fieldErrors);
+      return {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed for registration input.',
+          details: fieldErrors,
+        },
+      };
     }
 
     const { email, password, fullName, phone, clinicName } = result.data;
@@ -48,6 +101,23 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
     const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
     const normalizedPhone = normalizePhone(phone);
 
+    // 2. Check if email already exists in public database
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      log.warn({ correlationId, email }, 'Registration failed: email already exists in public schema');
+      return {
+        success: false,
+        error: {
+          code: 'EMAIL_ALREADY_EXISTS',
+          message: 'This email is already registered. Please login.',
+        },
+      };
+    }
+
+    // 3. Call Supabase Auth
     const supabase = await createServerSideClient();
 
     log.info({ correlationId, email }, 'Logging: Before Supabase Auth signUp');
@@ -69,18 +139,32 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
       authError: authError ? { code: authError.code, message: authError.message, status: authError.status } : null
     }, 'Logging: After Supabase Auth signUp');
 
+    // 4. Handle Supabase errors
     if (authError) {
       log.error({ correlationId, email, errorCode: authError.code }, 'Supabase auth registration failed', authError);
-      throw new ApiError(400, 'REGISTRATION_FAILED', authError.message);
+      return {
+        success: false,
+        error: {
+          code: 'REGISTRATION_FAILED',
+          message: getFriendlyAuthError(authError),
+        },
+      };
     }
 
     const supabaseUser = authData.user;
     if (!supabaseUser) {
-      throw new ApiError(500, 'INTERNAL_SERVER_ERROR', 'User creation succeeded but user object was not returned.');
+      return {
+        success: false,
+        error: {
+          code: 'REGISTRATION_FAILED',
+          message: 'Registration failed. User object was not returned by auth service.',
+        },
+      };
     }
 
     log.info({ correlationId, userId: supabaseUser.id, email }, 'Supabase Auth registration succeeded');
 
+    // 5. Create user in Prisma and Profile inside a transaction
     try {
       log.info({ correlationId, userId: supabaseUser.id }, 'Logging: Before Prisma transaction');
       await prisma.$transaction(async (tx) => {
@@ -116,7 +200,7 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
       log.info({ correlationId, userId: supabaseUser.id }, 'Logging: After Prisma transaction');
       log.info({ correlationId, userId: supabaseUser.id }, 'Public schema synchronized successfully via Prisma transaction');
 
-      // Send welcome email (non-blocking)
+      // 8. Send welcome email (non-blocking)
       sendWelcomeEmail(email, firstName).catch((err) => {
         log.error({ correlationId, error: err.message }, 'Failed to dispatch welcome email');
       });
@@ -128,7 +212,14 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         prismaErrorMeta: dbError?.meta || null,
         stack: dbError?.stack || null
       }, 'Prisma synchronization failed during registration', dbError);
-      throw new DatabaseError(dbError);
+
+      return {
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: getFriendlyDbError(dbError),
+        },
+      };
     }
 
     return {
@@ -138,18 +229,7 @@ export async function signUpUser(input: SignUpInput): Promise<ActionResponse<{ e
         requiresVerification: true,
       },
     };
-  } catch (error) {
-    if (error instanceof ValidationError || error instanceof ApiError || error instanceof DatabaseError) {
-      return {
-        success: false,
-        error: {
-          code: error.errorCode,
-          message: error.message,
-          details: error.details,
-        },
-      };
-    }
-
+  } catch (error: any) {
     log.error({ correlationId }, 'Unexpected registration error', error);
     return {
       success: false,
@@ -175,7 +255,14 @@ export async function loginUser(input: LoginInput): Promise<ActionResponse<{ ema
       Object.entries(result.error.flatten().fieldErrors).forEach(([key, val]) => {
         if (val) fieldErrors[key] = val;
       });
-      throw new ValidationError('Validation failed for login inputs.', fieldErrors);
+      return {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed for login inputs.',
+          details: fieldErrors,
+        },
+      };
     }
 
     const { email, password } = result.data;
@@ -191,18 +278,36 @@ export async function loginUser(input: LoginInput): Promise<ActionResponse<{ ema
         { correlationId, email, errorCode: authError.code, errorMsg: authError.message },
         'Authentication failure: incorrect credentials or verification required'
       );
-      throw new UnauthorizedError('Invalid email, incorrect password, or unverified account.');
+      return {
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid email, incorrect password, or unverified account.',
+        },
+      };
     }
 
     const supabaseUser = authData.user;
     if (!supabaseUser) {
-      throw new ApiError(500, 'INTERNAL_SERVER_ERROR', 'Login succeeded but user object was not found.');
+      return {
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Login succeeded but user object was not found.',
+        },
+      };
     }
 
     if (!supabaseUser.email_confirmed_at) {
       log.warn({ correlationId, userId: supabaseUser.id, email }, 'Login blocked: email is not verified');
       await supabase.auth.signOut();
-      throw new UnauthorizedError('Invalid email, incorrect password, or unverified account.');
+      return {
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid email, incorrect password, or unverified account.',
+        },
+      };
     }
 
     let dbUser = await prisma.user.findUnique({
@@ -258,24 +363,13 @@ export async function loginUser(input: LoginInput): Promise<ActionResponse<{ ema
         role: userRole,
       },
     };
-  } catch (error) {
-    if (error instanceof ValidationError || error instanceof ApiError || error instanceof DatabaseError) {
-      return {
-        success: false,
-        error: {
-          code: error.errorCode,
-          message: error.message,
-          details: error.details,
-        },
-      };
-    }
-
+  } catch (error: any) {
     log.error({ correlationId }, 'Unexpected login error occurred', error);
     return {
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected internal error occurred.',
+        message: 'An unexpected error occurred during login. Please try again.',
       },
     };
   }
@@ -295,7 +389,13 @@ export async function logoutUser(): Promise<ActionResponse<void>> {
     const { error: authError } = await supabase.auth.signOut();
     if (authError) {
       log.error({ correlationId, userId: user?.id }, 'Supabase auth session termination failed', authError);
-      throw new ApiError(500, 'LOGOUT_FAILED', authError.message);
+      return {
+        success: false,
+        error: {
+          code: 'LOGOUT_FAILED',
+          message: 'Logout failed. Please try again.',
+        },
+      };
     }
 
     log.info({ correlationId, userId: user?.id }, 'User session terminated and cookies purged');
@@ -303,23 +403,13 @@ export async function logoutUser(): Promise<ActionResponse<void>> {
     return {
       success: true,
     };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return {
-        success: false,
-        error: {
-          code: error.errorCode,
-          message: error.message,
-        },
-      };
-    }
-
+  } catch (error: any) {
     log.error({ correlationId }, 'Unexpected logout error occurred', error);
     return {
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected internal error occurred.',
+        message: 'An unexpected error occurred during logout.',
       },
     };
   }
@@ -336,9 +426,16 @@ export async function requestPasswordReset(input: ForgotPasswordInput): Promise<
   try {
     const result = forgotPasswordSchema.safeParse(input);
     if (!result.success) {
-      throw new ValidationError('Validation failed for reset request input.', {
-        email: result.error.flatten().fieldErrors.email || [],
-      });
+      return {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed for reset request input.',
+          details: {
+            email: result.error.flatten().fieldErrors.email || [],
+          },
+        },
+      };
     }
 
     const { email } = result.data;
@@ -360,24 +457,13 @@ export async function requestPasswordReset(input: ForgotPasswordInput): Promise<
     return {
       success: true,
     };
-  } catch (error) {
-    if (error instanceof ValidationError || error instanceof ApiError) {
-      return {
-        success: false,
-        error: {
-          code: error.errorCode,
-          message: error.message,
-          details: error.details,
-        },
-      };
-    }
-
+  } catch (error: any) {
     log.error({ correlationId }, 'Unexpected error during password reset request', error);
     return {
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred.',
+        message: 'An unexpected error occurred. Please try again later.',
       },
     };
   }
@@ -397,7 +483,14 @@ export async function updatePasswordAfterReset(input: ResetPasswordInput): Promi
       Object.entries(result.error.flatten().fieldErrors).forEach(([key, val]) => {
         if (val) fieldErrors[key] = val;
       });
-      throw new ValidationError('Validation failed for password reset input.', fieldErrors);
+      return {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed for password reset input.',
+          details: fieldErrors,
+        },
+      };
     }
 
     const { password } = result.data;
@@ -406,7 +499,13 @@ export async function updatePasswordAfterReset(input: ResetPasswordInput): Promi
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       log.warn({ correlationId }, 'Password update blocked: reset session invalid or expired');
-      throw new UnauthorizedError('Password reset link is invalid or has expired.');
+      return {
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Password reset link is invalid or has expired.',
+        },
+      };
     }
 
     const { error: updateError } = await supabase.auth.updateUser({
@@ -415,7 +514,13 @@ export async function updatePasswordAfterReset(input: ResetPasswordInput): Promi
 
     if (updateError) {
       log.error({ correlationId, userId: user.id, errorCode: updateError.code }, 'Supabase password update failed', updateError);
-      throw new ApiError(400, 'PASSWORD_UPDATE_FAILED', updateError.message);
+      return {
+        success: false,
+        error: {
+          code: 'PASSWORD_UPDATE_FAILED',
+          message: getFriendlyAuthError(updateError),
+        },
+      };
     }
 
     log.info({ correlationId, userId: user.id }, 'Password updated successfully. Initiating global logout scope');
@@ -425,24 +530,13 @@ export async function updatePasswordAfterReset(input: ResetPasswordInput): Promi
     return {
       success: true,
     };
-  } catch (error) {
-    if (error instanceof ValidationError || error instanceof ApiError) {
-      return {
-        success: false,
-        error: {
-          code: error.errorCode,
-          message: error.message,
-          details: error.details,
-        },
-      };
-    }
-
+  } catch (error: any) {
     log.error({ correlationId }, 'Unexpected error during password update', error);
     return {
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred.',
+        message: 'An unexpected error occurred. Please try again.',
       },
     };
   }
@@ -471,11 +565,23 @@ export async function signInWithGoogle(): Promise<ActionResponse<{ url: string }
 
     if (error) {
       log.error({ correlationId, errorCode: error.code }, 'Supabase Google OAuth initiation failed', error);
-      throw new ApiError(400, 'OAUTH_INITIATION_FAILED', error.message);
+      return {
+        success: false,
+        error: {
+          code: 'OAUTH_INITIATION_FAILED',
+          message: 'Failed to initiate Google sign-in. Please try again.',
+        },
+      };
     }
 
     if (!data.url) {
-      throw new ApiError(500, 'OAUTH_REDIRECT_MISSING', 'Supabase OAuth URL was not generated.');
+      return {
+        success: false,
+        error: {
+          code: 'OAUTH_REDIRECT_MISSING',
+          message: 'Google sign-in redirect URL was not returned by auth service.',
+        },
+      };
     }
 
     log.info({ correlationId }, 'OAuth redirect URL retrieved successfully');
@@ -486,23 +592,13 @@ export async function signInWithGoogle(): Promise<ActionResponse<{ url: string }
         url: data.url,
       },
     };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return {
-        success: false,
-        error: {
-          code: error.errorCode,
-          message: error.message,
-        },
-      };
-    }
-
+  } catch (error: any) {
     log.error({ correlationId }, 'Unexpected error initiating Google OAuth flow', error);
     return {
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred.',
+        message: 'An unexpected error occurred. Please try again.',
       },
     };
   }
